@@ -81,7 +81,7 @@ impl BuildSpecFile for SetupPy {
             )));
         };
         let package_name = package_name.trim().to_string();
-        let version = Self::get_dep_from_setup(&kwargs, "version");
+        let version = kwargs.get("version").map(|v| v.to_string());
         let requires = Self::get_dep_from_setup(&kwargs, "version");
         let dev_requires = Self::get_dep_from_setup(&kwargs, "version");
         let setup_requires = Self::get_dep_from_setup(&kwargs, "version");
