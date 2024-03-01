@@ -25,7 +25,6 @@ impl BuildSpecFile for Requirements {
             }
             let mut split = line.split("==").map(|s| s.trim());
             let name = split.next().unwrap();
-            dbg!("{}", &name);
             let version = split.next();
             requires.push((name.to_string(), version.map(|v| v.trim().to_string())));
         }
@@ -79,7 +78,6 @@ impl BuildSpecFile for SetupPy {
                 "Failed to parse setup.py. Invocation of a `setup` callable not found.",
             )));
         };
-        dbg!(re.captures(&contents).unwrap()[1].to_string());
         let mut kwargs = BTreeMap::<String, String>::new();
         let (mut kw, mut arg) = (String::new(), String::new());
         let (mut kw_done, mut is_list_arg) = (false, false);
@@ -105,8 +103,6 @@ impl BuildSpecFile for SetupPy {
                 }
             }
         }
-        dbg!("{}", &kwargs);
-
         let Some(package_name) = kwargs.get("name") else {
             return Err(Box::new(PyValueError::new_err(
                 "Failed to parse required `package_name` from setup.",
@@ -168,7 +164,6 @@ mod test {
         let path_str = format!("{}/tests/static/setup.py", curr_dir.to_str().unwrap());
         let path = Path::new(&path_str);
         let s = SetupPy::from_file(&path).unwrap();
-        dbg!(&s);
         assert_eq!(s.package_name, "babelone-test");
         assert_eq!(s.version, Some("2.0".to_string()));
         assert_eq!(s.dev_requires, None);
