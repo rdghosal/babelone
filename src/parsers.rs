@@ -68,6 +68,14 @@ impl SetupPy {
 }
 
 impl BuildSpecFile for SetupPy {
+
+    // TODO: handle mapping identifiers, and values therein, to setup kwargs.
+    // e.g., 
+    // ```python
+    // NAME = 'my-project'
+    //
+    // setup(name=NAME)
+    //```
     fn from_file(path: &Path) -> Result<Self, Box<dyn Error>>
     where
         Self: Sized,
