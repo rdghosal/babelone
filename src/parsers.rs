@@ -1,5 +1,6 @@
 use pyo3::exceptions::{PySyntaxError, PyValueError};
 use regex::Regex;
+use serde::Deserialize;
 use std::{collections::BTreeMap, error::Error, fs, path::Path};
 
 type Dependency = (String, Option<String>);
@@ -123,13 +124,35 @@ impl BuildSpecFile for SetupPy {
     }
 }
 
+#[derive(Debug, Deserialize)]
 struct PyProject {
-    build_system: Vec<String>, // TODO: type
-    package_name: String,
-    version: Option<String>,
-    dev_requires: Vec<Dependency>,
-    requires: Vec<Dependency>,
-    setup_requires: Vec<Dependency>,
+    #[serde(rename = "build-system")]
+    build_system: Option<BuildSystem>,
+    project: Option<Project>,
+}
+
+#[derive(Debug, Deserialize)]
+struct BuildSystem {
+    requires: Option<Vec<String>>,
+    build_backend: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Project {
+    name: String,
+    version: String,
+    dependencies: Option<Vec<String>>,
+}
+
+impl BuildSpecFile for PyProject {
+    fn from_file(path: &Path) -> Result<Self, Box<dyn Error>>
+    where
+        Self: Sized,
+    {
+        let contents = read_file(&path)?;
+        let pyproject = toml::from_str::<Self>(&contents)?;
+        Ok(pyproject)
+    }
 }
 
 fn read_file(path: &Path) -> Result<String, Box<dyn Error>> {
@@ -174,5 +197,15 @@ mod test {
                 ("fastapi".to_string(), None)
             ])
         );
+    }
+
+    #[test]
+    fn make_pyproject() {
+        let curr_dir = env::current_dir().unwrap();
+        let path_str = format!("{}/tests/static/pyproject.toml", curr_dir.to_str().unwrap());
+        let path = Path::new(&path_str);
+        let p = PyProject::from_file(&path).unwrap();
+        dbg!(p);
+        assert!(true);
     }
 }
