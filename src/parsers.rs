@@ -1,6 +1,6 @@
 use pyo3::exceptions::{PySyntaxError, PyValueError};
 use regex::Regex;
-use std::{collections::BTreeMap, error::Error, fs, iter::Map, path::Path};
+use std::{collections::BTreeMap, error::Error, fs, path::Path};
 
 type Dependency = (String, Option<String>);
 
