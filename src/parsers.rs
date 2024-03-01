@@ -134,6 +134,7 @@ struct PyProject {
 #[derive(Debug, Deserialize)]
 struct BuildSystem {
     requires: Option<Vec<String>>,
+    #[serde(rename = "build-backend")]
     build_backend: Option<String>,
 }
 
@@ -205,7 +206,19 @@ mod test {
         let path_str = format!("{}/tests/static/pyproject.toml", curr_dir.to_str().unwrap());
         let path = Path::new(&path_str);
         let p = PyProject::from_file(&path).unwrap();
-        dbg!(p);
-        assert!(true);
+        let build_system = p.build_system.unwrap();
+        let project = p.project.unwrap();
+        assert_eq!(&build_system.requires, &Some(vec!["hatchling".to_string()]));
+        assert_eq!(&build_system.build_backend, &Some("hatchling.build".to_string()));
+        assert_eq!(&project.name, "spam-eggs");
+        assert_eq!(&project.version, "2020.0.0");
+        assert_eq!(&project.dependencies, &Some(
+            vec![
+              "httpx".to_string(),
+              "gidgethub[httpx]>4.0.0".to_string(),
+              "django>2.1; os_name != 'nt'".to_string(),
+              "django>2.0; os_name == 'nt'".to_string(),
+            ]
+        ));
     }
 }
