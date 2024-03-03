@@ -1,4 +1,5 @@
-use serde::Deserialize;
+//! Models encapsulating Python package build specifications.
+use serde::{Serialize, Deserialize};
 
 /// Denotes a Python package dependency and its required version,
 ///
@@ -21,21 +22,21 @@ pub struct Setup {
 }
 
 /// Encapsulates build specifications defined in a pyproject.toml file.
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct PyProject {
     #[serde(rename = "build-system")]
     pub build_system: Option<BuildSystem>,
     pub project: Option<Project>,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct BuildSystem {
-    pub requires: Option<Vec<String>>,
     #[serde(rename = "build-backend")]
     pub build_backend: Option<String>,
+    pub requires: Option<Vec<String>>,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Project {
     pub name: String,
     pub version: String,

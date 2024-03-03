@@ -241,7 +241,7 @@ mod test {
     fn make_requirments() {
         let curr_dir = env::current_dir().unwrap();
         let path_str = format!(
-            "{}/tests/static/requirements.txt",
+            "{}/tests/inputs/requirements.txt",
             curr_dir.to_str().unwrap()
         );
         let path = Path::new(&path_str);
@@ -255,7 +255,7 @@ mod test {
     #[test]
     fn make_setuppy() {
         let curr_dir = env::current_dir().unwrap();
-        let path_str = format!("{}/tests/static/setup.py", curr_dir.to_str().unwrap());
+        let path_str = format!("{}/tests/inputs/setup.py", curr_dir.to_str().unwrap());
         let path = Path::new(&path_str);
         let s = SetupParser::from_file(&path).unwrap();
         assert_eq!(s.package_name, "babelone-test");
@@ -271,7 +271,7 @@ mod test {
     #[test]
     fn make_pyproject() {
         let curr_dir = env::current_dir().unwrap();
-        let path_str = format!("{}/tests/static/pyproject.toml", curr_dir.to_str().unwrap());
+        let path_str = format!("{}/tests/inputs/pyproject.toml", curr_dir.to_str().unwrap());
         let path = Path::new(&path_str);
         let p = PyProjectParser::from_file(&path).unwrap();
         let build_system = p.build_system.unwrap();

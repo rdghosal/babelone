@@ -1,8 +1,9 @@
-use pyo3::prelude::*;
-mod utils;
+mod generators;
 mod parsers;
 mod specs;
+mod utils;
 
+use pyo3::prelude::*;
 
 /// Formats the sum of two numbers as string.
 #[pyfunction]
