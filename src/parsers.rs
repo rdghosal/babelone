@@ -1,22 +1,20 @@
 //! Defines parsers used to exract Python package build specifications
 //! from applicable file types, e.g., requirements.txt, setup.py, and
 //! pyproject.toml
-
-use crate::utils;
 use pyo3::exceptions::PyValueError;
 use rustpython_parser::{ast, Parse};
-use serde::Deserialize;
 use std::{collections::BTreeMap, error::Error, path::Path};
 
-/// Denotes a Python package dependency and its required version,
-///
-/// # Examples
-/// `"pydantic==2.x"`, `"flask<3.0"`
-type Requirement = String;
+use crate::specs::*;
+use crate::utils;
+
+struct RequirementsParser;
+struct SetupParser;
+struct PyProjectParser;
 
 /// A build specification for a Python package, e.g., setup.py.
-trait PyBuildSpec {
-    fn from_file(path: &Path) -> Result<Self, Box<dyn Error>>
+trait SpecParser<T> {
+    fn from_file(path: &Path) -> Result<T, Box<dyn Error>>
     where
         Self: Sized;
 }
@@ -33,13 +31,8 @@ trait IdentValueMap {
     fn insert_assignments(&mut self, assignment: &ast::StmtAssign) -> &mut Self;
 }
 
-/// Encapsulates build requirements defined in a requirements.txt (or similar file).
-struct Requirements {
-    requires: Vec<Requirement>,
-}
-
-impl PyBuildSpec for Requirements {
-    fn from_file(path: &Path) -> Result<Self, Box<dyn Error>> {
+impl SpecParser<Requirements> for RequirementsParser {
+    fn from_file(path: &Path) -> Result<Requirements, Box<dyn Error>> {
         let mut requires = Vec::<Requirement>::new();
         let lines = utils::read_file(&path)?;
         let lines = lines.split("\n").map(|s| s.to_string());
@@ -49,20 +42,77 @@ impl PyBuildSpec for Requirements {
             }
             requires.push(line.trim().replace(" ", "").to_string());
         }
-        Ok(Self { requires })
+        Ok(Requirements { requires })
     }
 }
 
-/// Encapsulates build specifications defined in a setup.py file.
-struct Setup {
-    package_name: String,
-    version: Option<String>,
-    dev_requires: Option<Vec<Requirement>>,
-    install_requires: Option<Vec<Requirement>>,
-    setup_requires: Option<Vec<Requirement>>,
+impl SpecParser<Setup> for SetupParser {
+    fn from_file(path: &Path) -> Result<Setup, Box<dyn Error>>
+    where
+        Self: Sized,
+    {
+        let contents = utils::read_file(&path)?;
+        let mut assignments = BTreeMap::<String, ast::Expr>::new();
+        let statements = ast::Suite::parse(&contents, &path.to_str().unwrap())?;
+
+        let mut package_name: Option<String> = None;
+        let mut version: Option<String> = None;
+        let mut install_requires: Option<Vec<Requirement>> = None;
+        let mut setup_requires: Option<Vec<Requirement>> = None;
+        let mut dev_requires: Option<Vec<Requirement>> = None;
+
+        if let Some((setup, assignments)) =
+            Self::get_setup_call(&statements, &mut 0, &mut assignments)
+        {
+            for keyword in &setup.keywords {
+                let ident = keyword.arg.clone().unwrap();
+                match ident.as_str() {
+                    "name" => {
+                        package_name = Some(Self::parse_string(&keyword.value, &assignments)?)
+                    }
+                    "version" => version = Some(Self::parse_string(&keyword.value, &assignments)?),
+                    "install_requires" => {
+                        install_requires =
+                            Some(Self::parse_string_vec(&keyword.value, &assignments)?);
+                    }
+                    "setup_requires" => {
+                        setup_requires =
+                            Some(Self::parse_string_vec(&keyword.value, &assignments)?);
+                    }
+                    "dev_requires" => {
+                        dev_requires = Some(Self::parse_string_vec(&keyword.value, &assignments)?);
+                    }
+                    _ => continue,
+                }
+            }
+        }
+        if package_name.is_none() {
+            return Err(Box::new(PyValueError::new_err(
+                "package_name must be defined.",
+            )));
+        }
+        Ok(Setup {
+            package_name: package_name.unwrap(),
+            version,
+            install_requires,
+            dev_requires,
+            setup_requires,
+        })
+    }
 }
 
-impl Setup {
+impl SpecParser<PyProject> for PyProjectParser {
+    fn from_file(path: &Path) -> Result<PyProject, Box<dyn Error>>
+    where
+        Self: Sized,
+    {
+        let contents = utils::read_file(&path)?;
+        let pyproject = toml::from_str::<PyProject>(&contents)?;
+        Ok(pyproject)
+    }
+}
+
+impl SetupParser {
     fn parse_string(
         expr: &ast::Expr,
         assignments: &BTreeMap<String, ast::Expr>,
@@ -133,60 +183,6 @@ impl Setup {
     }
 }
 
-impl PyBuildSpec for Setup {
-    fn from_file(path: &Path) -> Result<Self, Box<dyn Error>>
-    where
-        Self: Sized,
-    {
-        let contents = utils::read_file(&path)?;
-        let mut assignments = BTreeMap::<String, ast::Expr>::new();
-        let statements = ast::Suite::parse(&contents, &path.to_str().unwrap())?;
-
-        let mut package_name: Option<String> = None;
-        let mut version: Option<String> = None;
-        let mut install_requires: Option<Vec<Requirement>> = None;
-        let mut setup_requires: Option<Vec<Requirement>> = None;
-        let mut dev_requires: Option<Vec<Requirement>> = None;
-
-        if let Some((setup, assignments)) =
-            Self::get_setup_call(&statements, &mut 0, &mut assignments)
-        {
-            for keyword in &setup.keywords {
-                let ident = keyword.arg.clone().unwrap();
-                match ident.as_str() {
-                    "name" => {
-                        package_name = Some(Self::parse_string(&keyword.value, &assignments)?)
-                    }
-                    "version" => version = Some(Self::parse_string(&keyword.value, &assignments)?),
-                    "install_requires" => {
-                        install_requires =
-                            Some(Self::parse_string_vec(&keyword.value, &assignments)?);
-                    }
-                    "setup_requires" => {
-                        setup_requires =
-                            Some(Self::parse_string_vec(&keyword.value, &assignments)?);
-                    }
-                    "dev_requires" => {
-                        dev_requires = Some(Self::parse_string_vec(&keyword.value, &assignments)?);
-                    }
-                    _ => continue,
-                }
-            }
-        }
-        if package_name.is_none() {
-            return Err(Box::new(PyValueError::new_err(
-                "package_name must be defined.",
-            )));
-        }
-        Ok(Self {
-            package_name: package_name.unwrap(),
-            version,
-            install_requires,
-            dev_requires,
-            setup_requires,
-        })
-    }
-}
 impl PyStr for ast::Expr {
     fn to_string(&self) -> Result<String, pyo3::PyErr> {
         if let ast::Expr::Constant(c) = &self {
@@ -236,39 +232,6 @@ impl IdentValueMap for BTreeMap<String, ast::Expr> {
     }
 }
 
-/// Encapsulates build specifications defined in a pyproject.toml file.
-#[derive(Deserialize)]
-struct PyProject {
-    #[serde(rename = "build-system")]
-    build_system: Option<BuildSystem>,
-    project: Option<Project>,
-}
-
-#[derive(Deserialize)]
-struct BuildSystem {
-    requires: Option<Vec<String>>,
-    #[serde(rename = "build-backend")]
-    build_backend: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct Project {
-    name: String,
-    version: String,
-    dependencies: Option<Vec<String>>,
-}
-
-impl PyBuildSpec for PyProject {
-    fn from_file(path: &Path) -> Result<Self, Box<dyn Error>>
-    where
-        Self: Sized,
-    {
-        let contents = utils::read_file(&path)?;
-        let pyproject = toml::from_str::<Self>(&contents)?;
-        Ok(pyproject)
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -282,7 +245,7 @@ mod test {
             curr_dir.to_str().unwrap()
         );
         let path = Path::new(&path_str);
-        let r = Requirements::from_file(&path).unwrap();
+        let r = RequirementsParser::from_file(&path).unwrap();
         assert_eq!(
             r.requires,
             vec!["flask".to_string(), "pydantic==2.x".to_string()]
@@ -294,7 +257,7 @@ mod test {
         let curr_dir = env::current_dir().unwrap();
         let path_str = format!("{}/tests/static/setup.py", curr_dir.to_str().unwrap());
         let path = Path::new(&path_str);
-        let s = Setup::from_file(&path).unwrap();
+        let s = SetupParser::from_file(&path).unwrap();
         assert_eq!(s.package_name, "babelone-test");
         assert_eq!(s.version, Some("2.0".to_string()));
         assert_eq!(s.dev_requires, None);
@@ -310,7 +273,7 @@ mod test {
         let curr_dir = env::current_dir().unwrap();
         let path_str = format!("{}/tests/static/pyproject.toml", curr_dir.to_str().unwrap());
         let path = Path::new(&path_str);
-        let p = PyProject::from_file(&path).unwrap();
+        let p = PyProjectParser::from_file(&path).unwrap();
         let build_system = p.build_system.unwrap();
         let project = p.project.unwrap();
         assert_eq!(&build_system.requires, &Some(vec!["hatchling".to_string()]));

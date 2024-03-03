@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 mod utils;
 mod parsers;
+mod specs;
 
 
 /// Formats the sum of two numbers as string.
