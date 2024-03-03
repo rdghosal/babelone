@@ -9,7 +9,10 @@ name = "babelone"
 crate-type = ["cdylib"]
 
 [dependencies]
+log = "0.4.21"
 pyo3 = "0.19.0"
+pyo3-log = "0.9.0"
 regex = "1.10.3"
+rustpython-parser = "0.3.0"
 serde = { version = "1.0.197", features = ["derive"] }
 toml = "0.8.10"
