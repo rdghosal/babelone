@@ -1,5 +1,5 @@
 //! Models encapsulating Python package build specifications.
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Denotes a Python package dependency and its required version,
 ///
@@ -13,6 +13,7 @@ pub struct Requirements {
 }
 
 /// Encapsulates build specifications defined in a setup.py file.
+#[derive(Debug)]
 pub struct Setup {
     pub package_name: String,
     pub version: Option<String>,
@@ -22,23 +23,49 @@ pub struct Setup {
 }
 
 /// Encapsulates build specifications defined in a pyproject.toml file.
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PyProject {
+    pub project: Option<Project>,
     #[serde(rename = "build-system")]
     pub build_system: Option<BuildSystem>,
-    pub project: Option<Project>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct BuildSystem {
     #[serde(rename = "build-backend")]
     pub build_backend: Option<String>,
     pub requires: Option<Vec<String>>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Project {
     pub name: String,
-    pub version: String,
+    pub version: Option<String>,
     pub dependencies: Option<Vec<String>>,
+}
+
+impl PyProject {
+    pub fn from_setup(setup: Setup) -> Self {
+        let name = setup.package_name;
+        let version = setup.version;
+        let dependencies = setup.install_requires;
+        let requires = setup.setup_requires;
+        let build_system = if requires.is_some() {
+            Some(BuildSystem {
+                requires,
+                build_backend: None, // TODO
+            })
+        } else {
+            None
+        };
+        let project = Some(Project {
+            name,
+            version,
+            dependencies,
+        });
+        Self {
+            project,
+            build_system,
+        }
+    }
 }

@@ -8,12 +8,12 @@ use std::{collections::BTreeMap, error::Error, path::Path};
 use crate::specs::*;
 use crate::utils;
 
-struct RequirementsParser;
-struct SetupParser;
-struct PyProjectParser;
+pub struct RequirementsParser;
+pub struct SetupParser;
+pub struct PyProjectParser;
 
 /// A build specification for a Python package, e.g., setup.py.
-trait SpecParser<T> {
+pub trait SpecParser<T> {
     fn from_file(path: &Path) -> Result<T, Box<dyn Error>>
     where
         Self: Sized;
@@ -282,7 +282,7 @@ mod test {
             &Some("hatchling.build".to_string())
         );
         assert_eq!(&project.name, "spam-eggs");
-        assert_eq!(&project.version, "2020.0.0");
+        assert_eq!(&project.version, &Some("2020.0.0".to_string()));
         assert_eq!(
             &project.dependencies,
             &Some(vec![

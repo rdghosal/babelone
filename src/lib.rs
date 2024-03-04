@@ -1,6 +1,6 @@
-mod generators;
-mod parsers;
-mod specs;
+pub mod generators;
+pub mod parsers;
+pub mod specs;
 mod utils;
 
 use pyo3::prelude::*;
