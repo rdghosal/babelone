@@ -1,5 +1,13 @@
 //! Models encapsulating Python package build specifications.
 use serde::{Deserialize, Serialize};
+use pyo3::prelude::*;
+
+#[pyclass]
+pub enum PyBuildSpec {
+    Requirements,
+    Setup,
+    PyProject,
+}
 
 /// Denotes a Python package dependency and its required version,
 ///

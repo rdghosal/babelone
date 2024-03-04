@@ -11,6 +11,12 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dynamic = ["version"]
+dependencies = ["rich-click"]
+
+[project.scripts]
+babelone = "babelone_cli:main"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
+python-source = "python"
+module-name = "babelone_cli._babelone_core"
