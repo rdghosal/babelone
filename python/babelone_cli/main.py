@@ -12,12 +12,12 @@ import rich_click as click
 @click.argument("destination", required=True)
 def translate(source: str, destination: str):
     """Translates a Python package build specification file from one
-    format to another, e.g., setup.py -> pyproject.toml.
+    format to another.
+
+    e.g., setup.py -> pyproject.toml.
 
     """
     _babelone_core.translate(source, destination)
 
 
 translate()
-# if __name__ == "__main__":
-#     translate()
