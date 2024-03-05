@@ -1,4 +1,7 @@
 [project]
 name = "test"
 version = "2.1"
-dependencies = ["pydantic==2.x", "flask"]
+dependencies = [
+    "pydantic==2.x",
+    "flask",
+]

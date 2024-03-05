@@ -69,7 +69,7 @@ impl SpecGenerator<Setup> for SetupGenerator {
 
 impl SpecGenerator<PyProject> for PyProjectGenerator {
     fn make_file(path: &Path, spec: &PyProject) -> Result<(), Box<dyn Error>> {
-        let contents = toml::to_string::<PyProject>(&spec)?;
+        let contents = toml::to_string_pretty::<PyProject>(&spec)?;
         fs::write(path, contents)?;
         Ok(())
     }
