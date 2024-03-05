@@ -102,7 +102,7 @@ impl SpecParser<Setup> for SetupParser {
             )));
         }
         Ok(Setup {
-            package_name: package_name.unwrap(),
+            package_name,
             version,
             install_requires,
             dev_requires,
@@ -290,7 +290,7 @@ mod test {
         let path_str = format!("{}/tests/inputs/setup.py", curr_dir.to_str().unwrap());
         let path = Path::new(&path_str);
         let s = SetupParser::from_file(&path).unwrap();
-        assert_eq!(s.package_name, "babelone-test");
+        assert_eq!(s.package_name, Some("babelone-test".to_string()));
         assert_eq!(s.version, Some("2.0".to_string()));
         assert_eq!(s.dev_requires, None);
         assert_eq!(s.setup_requires, None);
@@ -313,7 +313,7 @@ mod test {
             &build_system.build_backend,
             &Some("hatchling.build".to_string())
         );
-        assert_eq!(&project.name, "spam-eggs");
+        assert_eq!(&project.name, &Some("spam-eggs".to_string()));
         assert_eq!(&project.version, &Some("2020.0.0".to_string()));
         assert_eq!(
             &project.dependencies,

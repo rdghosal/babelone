@@ -23,7 +23,7 @@ pub struct Requirements {
 /// Encapsulates build specifications defined in a setup.py file.
 #[derive(Debug)]
 pub struct Setup {
-    pub package_name: String,
+    pub package_name: Option<String>,
     pub version: Option<String>,
     pub dev_requires: Option<Vec<Requirement>>,
     pub install_requires: Option<Vec<Requirement>>,
@@ -47,7 +47,7 @@ pub struct BuildSystem {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Project {
-    pub name: String,
+    pub name: Option<String>,
     pub version: Option<String>,
     pub dependencies: Option<Vec<String>>,
 }
