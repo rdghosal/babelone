@@ -1,6 +1,7 @@
 //! Defines parsers used to exract Python package build specifications
 //! from applicable file types, e.g., requirements.txt, setup.py, and
 //! pyproject.toml
+use pyo3::exceptions::PyTypeError;
 use pyo3::exceptions::PyValueError;
 use rustpython_parser::{ast, Parse};
 use std::{collections::BTreeMap, error::Error, path::Path};
@@ -11,6 +12,11 @@ use crate::utils;
 pub struct RequirementsParser;
 pub struct SetupParser;
 pub struct PyProjectParser;
+
+enum PyAssignment<'a> {
+    Annotated(&'a ast::StmtAnnAssign),
+    Unannotated(&'a ast::StmtAssign),
+}
 
 /// A build specification for a Python package, e.g., setup.py.
 pub trait SpecParser<T> {
@@ -23,12 +29,16 @@ trait PyStr {
     fn to_string(&self) -> Result<String, pyo3::PyErr>;
 }
 
+trait PyIdent {
+    fn as_ident(&self) -> Result<String, pyo3::PyErr>;
+}
+
 trait PyStrList {
     fn to_string_vec(&self) -> Result<Vec<String>, pyo3::PyErr>;
 }
 
 trait IdentValueMap {
-    fn insert_assignments(&mut self, assignment: &ast::StmtAssign) -> &mut Self;
+    fn insert_assignments(&mut self, assignment: PyAssignment) -> pyo3::PyResult<&mut Self>;
 }
 
 impl SpecParser<Requirements> for RequirementsParser {
@@ -62,7 +72,7 @@ impl SpecParser<Setup> for SetupParser {
         let mut dev_requires: Option<Vec<Requirement>> = None;
 
         if let Some((setup, assignments)) =
-            Self::get_setup_call(&statements, &mut 0, &mut assignments)
+            Self::get_setup_call(&statements, &mut 0, &mut assignments)?
         {
             for keyword in &setup.keywords {
                 let ident = keyword.arg.clone().unwrap();
@@ -128,7 +138,7 @@ impl SetupParser {
             }
             _ => (),
         }
-        return Err(PyValueError::new_err("Failed to parse string."));
+        return Err(PyValueError::new_err("Failed to parse Expr as String."));
     }
 
     fn parse_string_vec(
@@ -146,18 +156,23 @@ impl SetupParser {
             }
             _ => (),
         }
-        return Err(PyValueError::new_err("Failed to parse Vec<String>."));
+        return Err(PyValueError::new_err(
+            "Failed to parse Expr as Vec<String>.",
+        ));
     }
 
     fn get_setup_call<'a>(
         statements: &'a Vec<ast::Stmt>,
         idx: &mut usize,
         assignments: &'a mut BTreeMap<String, ast::Expr>,
-    ) -> Option<(&'a ast::ExprCall, &'a mut BTreeMap<String, ast::Expr>)> {
+    ) -> pyo3::PyResult<Option<(&'a ast::ExprCall, &'a mut BTreeMap<String, ast::Expr>)>> {
         if *idx < statements.len() {
             match &statements[*idx] {
                 ast::Stmt::Assign(assignment) => {
-                    assignments.insert_assignments(assignment);
+                    assignments.insert_assignments(PyAssignment::Unannotated(assignment))?;
+                }
+                ast::Stmt::AnnAssign(assignment) => {
+                    assignments.insert_assignments(PyAssignment::Annotated(assignment))?;
                 }
                 ast::Stmt::If(if_stmt) => {
                     return Self::get_setup_call(&if_stmt.body, &mut 0, assignments);
@@ -170,7 +185,7 @@ impl SetupParser {
                             _ => false,
                         };
                         if is_setup {
-                            return Some((c, assignments));
+                            return Ok(Some((c, assignments)));
                         }
                     };
                 }
@@ -179,7 +194,7 @@ impl SetupParser {
             *idx += 1;
             return Self::get_setup_call(statements, idx, assignments);
         }
-        return None;
+        return Ok(None);
     }
 }
 
@@ -193,6 +208,17 @@ impl PyStr for ast::Expr {
         return Err(PyValueError::new_err(
             "Failed to parse String value from ExprConstant.",
         ));
+    }
+}
+
+impl PyIdent for ast::Expr {
+    fn as_ident(&self) -> pyo3::PyResult<String> {
+        match self {
+            ast::Expr::Name(e) => Ok(e.id.to_string()),
+            _ => Err(PyTypeError::new_err(
+                "Expected name of Expr::Name in assignment parsing.",
+            )),
+        }
     }
 }
 
@@ -216,19 +242,25 @@ impl PyStrList for ast::Expr {
 }
 
 impl IdentValueMap for BTreeMap<String, ast::Expr> {
-    fn insert_assignments(&mut self, assignment: &ast::StmtAssign) -> &mut Self {
-        let mut identifiers = Vec::<String>::new();
-        for target in assignment.targets.iter() {
-            let ast::Expr::Name(e) = target else {
-                panic!("Expected name of Expr::Name in assignment parsing.");
-            };
-            let identifier = e.id.to_string();
-            identifiers.push(identifier);
+    fn insert_assignments(&mut self, assignment: PyAssignment) -> pyo3::PyResult<&mut Self> {
+        match assignment {
+            PyAssignment::Unannotated(assignment) => {
+                let mut identifiers = Vec::<String>::new();
+                for target in assignment.targets.iter() {
+                    identifiers.push(target.as_ident()?);
+                }
+                for identifier in identifiers {
+                    self.insert(identifier, *assignment.value.clone());
+                }
+            }
+            PyAssignment::Annotated(assignment) => {
+                let target = &assignment.target;
+                if let Some(value) = &assignment.value {
+                    self.insert(target.as_ident()?, *value.clone());
+                }
+            }
         }
-        for identifier in identifiers {
-            self.insert(identifier, *assignment.value.clone());
-        }
-        self
+        Ok(self)
     }
 }
 

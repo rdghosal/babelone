@@ -1,6 +1,10 @@
 import setuptools
 
-VERSION = "2.0"
+VERSION: str = "2.0"
+REQUIRES = [
+    "pydantic==2.6.2",
+    "fastapi",
+]
 
 
 if __name__ == "__main__":
@@ -8,8 +12,5 @@ if __name__ == "__main__":
         name="babelone-test",
         version=VERSION,
         author="Rahul D. Ghosal",
-        install_requires=[
-            "pydantic==2.6.2",
-            "fastapi",
-        ],
+        install_requires=REQUIRES
     )
