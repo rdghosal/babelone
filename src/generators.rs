@@ -4,11 +4,24 @@ use std::path::Path;
 
 use crate::specs::*;
 
+pub struct RequirementsGenerator;
 pub struct SetupGenerator;
 pub struct PyProjectGenerator;
 
 pub trait SpecGenerator<T> {
     fn make_file(path: &Path, spec: &T) -> Result<(), Box<dyn Error>>;
+}
+
+impl SpecGenerator<Requirements> for RequirementsGenerator {
+    fn make_file(path: &Path, spec: &Requirements) -> Result<(), Box<dyn Error>> {
+        let mut contents = String::new();
+        for requirement in spec.requires.iter() {
+            contents.push_str(&requirement);
+            contents.push_str("\n");
+        }
+        fs::write(path, contents)?;
+        Ok(())
+    }
 }
 
 impl SpecGenerator<Setup> for SetupGenerator {
@@ -66,6 +79,21 @@ impl SpecGenerator<PyProject> for PyProjectGenerator {
 mod tests {
     use super::*;
     use std::env;
+
+    #[test]
+    fn generate_requirements() {
+        let curr_dir = env::current_dir().unwrap();
+        let path_str = format!(
+            "{}/tests/outputs/requirements__generate_requirements.txt",
+            curr_dir.to_str().unwrap()
+        );
+        let path = Path::new(&path_str);
+        let spec = Requirements {
+            requires: vec!["flask".to_string(), "pydantic==2.6.1".to_string()],
+        };
+        let result = RequirementsGenerator::make_file(&path, &spec);
+        assert!(result.is_ok());
+    }
 
     #[test]
     fn generate_setup() {
