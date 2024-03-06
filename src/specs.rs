@@ -1,4 +1,6 @@
 //! Models encapsulating Python package build specifications.
+use std::collections::BTreeMap;
+
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -25,7 +27,7 @@ pub struct Requirements {
 pub struct Setup {
     pub package_name: Option<String>,
     pub version: Option<String>,
-    pub dev_requires: Option<Vec<Requirement>>,
+    pub extra_requires: Option<BTreeMap<String, Vec<Requirement>>>,
     pub install_requires: Option<Vec<Requirement>>,
     pub setup_requires: Option<Vec<Requirement>>,
 }
@@ -87,7 +89,7 @@ impl Setup {
         Self {
             install_requires,
             setup_requires: None,
-            dev_requires: None,
+            extra_requires: None,
             package_name: None,
             version: None,
         }
@@ -112,7 +114,7 @@ impl Setup {
             version,
             install_requires,
             setup_requires,
-            dev_requires: None,
+            extra_requires: None,
         }
     }
 }

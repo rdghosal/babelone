@@ -106,7 +106,7 @@ mod tests {
         let spec = Setup {
             package_name: Some("babelone-test".to_string()),
             version: Some("v0.1.1".to_string()),
-            dev_requires: None,
+            extra_requires: None,
             install_requires: Some(vec!["flask".to_string(), "pydantic==2.6.1".to_string()]),
             setup_requires: None,
         };

@@ -69,7 +69,7 @@ impl SpecParser<Setup> for SetupParser {
         let mut version: Option<String> = None;
         let mut install_requires: Option<Vec<Requirement>> = None;
         let mut setup_requires: Option<Vec<Requirement>> = None;
-        let mut dev_requires: Option<Vec<Requirement>> = None;
+        let mut extra_requires: Option<BTreeMap<String, Vec<Requirement>>> = None;
 
         if let Some((setup, assignments)) =
             Self::get_setup_call(&statements, &mut 0, &mut assignments)?
@@ -89,8 +89,9 @@ impl SpecParser<Setup> for SetupParser {
                         setup_requires =
                             Some(Self::parse_string_vec(&keyword.value, &assignments)?);
                     }
-                    "dev_requires" => {
-                        dev_requires = Some(Self::parse_string_vec(&keyword.value, &assignments)?);
+                    "extra_requires" => {
+                        extra_requires =
+                            Some(Self::parse_requires_map(&keyword.value, &assignments)?);
                     }
                     _ => continue,
                 }
@@ -105,7 +106,7 @@ impl SpecParser<Setup> for SetupParser {
             package_name,
             version,
             install_requires,
-            dev_requires,
+            extra_requires,
             setup_requires,
         })
     }
@@ -158,6 +159,36 @@ impl SetupParser {
         }
         return Err(PyValueError::new_err(
             "Failed to parse Expr as Vec<String>.",
+        ));
+    }
+
+    fn parse_requires_map(
+        expr: &ast::Expr,
+        assignments: &BTreeMap<String, ast::Expr>,
+    ) -> Result<BTreeMap<String, Vec<Requirement>>, pyo3::PyErr> {
+        let mut mapped = BTreeMap::<String, Vec<Requirement>>::new();
+        match expr {
+            ast::Expr::Dict(dict) => {
+                for (i, key) in dict.keys.iter().enumerate() {
+                    if let Some(key) = key {
+                        let value = &dict.values[i];
+                        mapped.insert(
+                            key.to_string()?,
+                            Self::parse_string_vec(value, assignments)?,
+                        );
+                    }
+                }
+                return Ok(mapped);
+            }
+            ast::Expr::Name(name) => {
+                if let Some(v) = assignments.get(&name.id.to_string()) {
+                    return Ok(Self::parse_requires_map(v, assignments)?);
+                }
+            }
+            _ => (),
+        }
+        return Err(PyValueError::new_err(
+            "Failed to parse Expr as BTreeMap<String, Vec<String>>.",
         ));
     }
 
@@ -292,7 +323,19 @@ mod test {
         let s = SetupParser::from_file(&path).unwrap();
         assert_eq!(s.package_name, Some("babelone-test".to_string()));
         assert_eq!(s.version, Some("2.0".to_string()));
-        assert_eq!(s.dev_requires, None);
+        assert_eq!(
+            s.extra_requires,
+            Some(BTreeMap::<String, Vec<Requirement>>::from([
+                (
+                    "dev".to_string(),
+                    vec!["pytest".to_string(), "hypothesis>=6.95.x".to_string()]
+                ),
+                (
+                    "PDF".to_string(),
+                    vec!["ReportLab>=1.2".to_string(), "RXP".to_string()]
+                )
+            ]))
+        );
         assert_eq!(s.setup_requires, None);
         assert_eq!(
             s.install_requires,
