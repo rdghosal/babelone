@@ -46,6 +46,7 @@ impl SpecGenerator<Setup> for SetupGenerator {
         install_requires={:?},
         setup_requires={:?},
         extra_requires={:?},
+        entry_points={:?},
     )"#,
             spec.package_name.as_ref().unwrap_or(&String::new()),
             spec.version.as_ref().unwrap_or(&String::new()),
@@ -57,7 +58,11 @@ impl SpecGenerator<Setup> for SetupGenerator {
                 .unwrap_or(&Vec::<String>::new()),
             spec.extra_requires
                 .as_ref()
-                .unwrap_or(&BTreeMap::<String, Vec::<String>>::new())
+                .unwrap_or(&BTreeMap::<String, Vec::<String>>::new()),
+            spec.entry_points.as_ref().unwrap_or(&Entrypoints {
+                console_scripts: Some(Vec::<String>::new()),
+                gui_scripts: Some(Vec::<String>::new())
+            })
         );
         let entrypoint = r#"if __name__ == "__main__":"#;
         contents.push_str(&docstring);
@@ -116,7 +121,10 @@ mod tests {
             )])),
             install_requires: Some(vec!["flask".to_string(), "pydantic==2.6.1".to_string()]),
             setup_requires: None,
-            entry_points: None,
+            entry_points: Some(Entrypoints {
+                console_scripts: Some(vec!["hello-world = timmins:hello_world".to_string()]),
+                gui_scripts: None,
+            }),
         };
         let result = SetupGenerator::make_file(&path, &spec);
         assert!(result.is_ok());

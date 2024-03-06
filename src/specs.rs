@@ -1,5 +1,5 @@
 //! Models encapsulating Python package build specifications.
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt};
 
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -33,7 +33,6 @@ pub struct Setup {
     pub entry_points: Option<Entrypoints>,
 }
 
-#[derive(Debug)]
 pub struct Entrypoints {
     pub console_scripts: Option<Vec<String>>,
     pub gui_scripts: Option<Vec<String>>,
@@ -171,6 +170,22 @@ impl Setup {
         }
     }
 }
+
+impl fmt::Debug for Entrypoints {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_map()
+            .entry(
+                &"console_scripts",
+                &self.console_scripts.as_ref().unwrap_or(&Vec::<String>::new()),
+            )
+            .entry(
+                &"gui_scripts",
+                &self.gui_scripts.as_ref().unwrap_or(&Vec::<String>::new()),
+            )
+            .finish()
+    }
+}
+
 impl PyProject {
     pub fn from_requirements(requirements: Requirements) -> Self {
         let dependencies = Some(requirements.requires);
