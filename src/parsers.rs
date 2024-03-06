@@ -70,6 +70,7 @@ impl SpecParser<Setup> for SetupParser {
         let mut install_requires: Option<Vec<Requirement>> = None;
         let mut setup_requires: Option<Vec<Requirement>> = None;
         let mut extra_requires: Option<BTreeMap<String, Vec<Requirement>>> = None;
+        let mut entry_points: Option<Entrypoints> = None;
 
         if let Some((setup, assignments)) =
             Self::get_setup_call(&statements, &mut 0, &mut assignments)?
@@ -93,6 +94,10 @@ impl SpecParser<Setup> for SetupParser {
                         extra_requires =
                             Some(Self::parse_requires_map(&keyword.value, &assignments)?);
                     }
+                    "entry_points" => {
+                        entry_points =
+                            Some(Self::parse_entrypoints(&keyword.value, &assignments)?);
+                    }
                     _ => continue,
                 }
             }
@@ -108,6 +113,7 @@ impl SpecParser<Setup> for SetupParser {
             install_requires,
             extra_requires,
             setup_requires,
+            entry_points,
         })
     }
 }
@@ -183,6 +189,42 @@ impl SetupParser {
             ast::Expr::Name(name) => {
                 if let Some(v) = assignments.get(&name.id.to_string()) {
                     return Ok(Self::parse_requires_map(v, assignments)?);
+                }
+            }
+            _ => (),
+        }
+        return Err(PyValueError::new_err(
+            "Failed to parse Expr as BTreeMap<String, Vec<String>>.",
+        ));
+    }
+
+    fn parse_entrypoints(
+        expr: &ast::Expr,
+        assignments: &BTreeMap<String, ast::Expr>,
+    ) -> Result<Entrypoints, pyo3::PyErr> {
+        match expr {
+            ast::Expr::Dict(dict) => {
+                let mut entry_points = Entrypoints {
+                    console_scripts: None,
+                    gui_scripts: None,
+                };
+                for (i, key) in dict.keys.iter().enumerate() {
+                    if let Some(key) = key {
+                        let key = key.to_string()?;
+                        if key == "console_scripts".to_string() {
+                            entry_points.console_scripts = Some(dict.values[i].to_string_vec()?);
+                        } else if key == "gui_scripts".to_string() {
+                            entry_points.gui_scripts = Some(dict.values[i].to_string_vec()?);
+                        }
+                    }
+                }
+                if entry_points.console_scripts.is_some() || entry_points.gui_scripts.is_some() {
+                    return Ok(entry_points);
+                }
+            }
+            ast::Expr::Name(name) => {
+                if let Some(v) = assignments.get(&name.id.to_string()) {
+                    return Ok(Self::parse_entrypoints(v, assignments)?);
                 }
             }
             _ => (),
@@ -340,6 +382,14 @@ mod test {
         assert_eq!(
             s.install_requires,
             Some(vec!["pydantic==2.6.2".to_string(), "fastapi".to_string(),])
+        );
+        assert_eq!(
+            s.entry_points.as_ref().unwrap().console_scripts,
+            Some(vec!["hello-world = timmins:hello_world".to_string()])
+        );
+        assert_eq!(
+            s.entry_points.as_ref().unwrap().gui_scripts,
+            Some(vec!["hello-world = timmins:hello_world".to_string()])
         );
     }
 

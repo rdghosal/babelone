@@ -15,3 +15,9 @@ dev = [
     "pytest",
     "hypothesis>=6.95.x",
 ]
+
+[project.scripts]
+hello-world = "timmins:hello_world"
+
+[project.gui-scripts]
+hello-world = "timmins:hello_world"

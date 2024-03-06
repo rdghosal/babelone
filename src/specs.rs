@@ -30,6 +30,13 @@ pub struct Setup {
     pub extra_requires: Option<BTreeMap<String, Vec<Requirement>>>,
     pub install_requires: Option<Vec<Requirement>>,
     pub setup_requires: Option<Vec<Requirement>>,
+    pub entry_points: Option<Entrypoints>,
+}
+
+#[derive(Debug)]
+pub struct Entrypoints {
+    pub console_scripts: Option<Vec<String>>,
+    pub gui_scripts: Option<Vec<String>>,
 }
 
 /// Encapsulates build specifications defined in a pyproject.toml file.
@@ -54,6 +61,10 @@ pub struct Project {
     pub dependencies: Option<Vec<Requirement>>,
     #[serde(rename = "optional-dependencies")]
     pub optional_dependencies: Option<BTreeMap<String, Vec<Requirement>>>,
+    #[serde(rename = "scripts")]
+    pub project_scripts: Option<BTreeMap<String, String>>,
+    #[serde(rename = "gui-scripts")]
+    pub project_gui_scripts: Option<BTreeMap<String, String>>,
 }
 
 impl Requirements {
@@ -96,23 +107,53 @@ impl Setup {
             install_requires,
             setup_requires: None,
             extra_requires: None,
+            entry_points: None,
             package_name: None,
             version: None,
         }
     }
 
     pub fn from_pyproject(pyproject: PyProject) -> Self {
-        let (package_name, version, install_requires, extra_requires) =
+        let (package_name, version, install_requires, extra_requires, entry_points) =
             if pyproject.project.is_some() {
                 let project = pyproject.project.unwrap();
+                let mut console_scripts: Option<Vec<String>> = None;
+                let mut gui_scripts: Option<Vec<String>> = None;
+                if let Some(project_scripts) = project.project_scripts {
+                    let mut scripts = Vec::<String>::new();
+                    for (key, value) in project_scripts.iter() {
+                        scripts.push(format!("{} = {}", key, value));
+                    }
+                    if !scripts.is_empty() {
+                        console_scripts = Some(scripts);
+                    }
+                }
+                if let Some(project_gui_scripts) = project.project_gui_scripts {
+                    let mut scripts = Vec::<String>::new();
+                    for (key, value) in project_gui_scripts.iter() {
+                        scripts.push(format!("{} = {}", key, value));
+                    }
+                    if !scripts.is_empty() {
+                        gui_scripts = Some(scripts);
+                    }
+                }
+                let entry_points = if console_scripts.is_some() || gui_scripts.is_some() {
+                    Some(Entrypoints {
+                        console_scripts,
+                        gui_scripts,
+                    })
+                } else {
+                    None
+                };
                 (
                     project.name,
                     project.version,
                     project.dependencies,
                     project.optional_dependencies,
+                    entry_points,
                 )
             } else {
-                (None, None, None, None)
+                (None, None, None, None, None)
             };
         let setup_requires = if pyproject.build_system.is_some() {
             let build_system = pyproject.build_system.unwrap();
@@ -126,6 +167,7 @@ impl Setup {
             install_requires,
             setup_requires,
             extra_requires,
+            entry_points,
         }
     }
 }
@@ -134,10 +176,12 @@ impl PyProject {
         let dependencies = Some(requirements.requires);
         let build_system = None;
         let project = Some(Project {
+            dependencies,
             name: None,
             version: None,
             optional_dependencies: None,
-            dependencies,
+            project_scripts: None,
+            project_gui_scripts: None,
         });
         Self {
             project,
@@ -159,11 +203,37 @@ impl PyProject {
         } else {
             None
         };
+        let mut project_scripts: Option<BTreeMap<String, String>> = None;
+        let mut project_gui_scripts: Option<BTreeMap<String, String>> = None;
+        if let Some(entry_points) = setup.entry_points {
+            if let Some(console_scripts) = entry_points.console_scripts {
+                let mut scripts = BTreeMap::<String, String>::new();
+                for console_script in console_scripts.iter() {
+                    let mut key_and_path = console_script.split('=').map(|s| s.trim().to_string());
+                    scripts.insert(key_and_path.next().unwrap(), key_and_path.next().unwrap());
+                }
+                if !scripts.is_empty() {
+                    project_scripts = Some(scripts);
+                }
+            }
+            if let Some(gui_scripts) = entry_points.gui_scripts {
+                let mut scripts = BTreeMap::<String, String>::new();
+                for gui_script in gui_scripts.iter() {
+                    let mut key_and_path = gui_script.split('=').map(|s| s.trim().to_string());
+                    scripts.insert(key_and_path.next().unwrap(), key_and_path.next().unwrap());
+                }
+                if !scripts.is_empty() {
+                    project_gui_scripts = Some(scripts);
+                }
+            }
+        }
         let project = Some(Project {
             name,
             version,
             dependencies,
             optional_dependencies,
+            project_scripts,
+            project_gui_scripts,
         });
         Self {
             project,

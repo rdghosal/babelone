@@ -116,6 +116,7 @@ mod tests {
             )])),
             install_requires: Some(vec!["flask".to_string(), "pydantic==2.6.1".to_string()]),
             setup_requires: None,
+            entry_points: None,
         };
         let result = SetupGenerator::make_file(&path, &spec);
         assert!(result.is_ok());
@@ -138,6 +139,8 @@ mod tests {
                     "dev".to_string(),
                     vec!["pytest".to_string(), "hypothesis>=6.98.1".to_string()],
                 )])),
+                project_scripts: None,
+                project_gui_scripts: None,
             }),
             build_system: None,
         };

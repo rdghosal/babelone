@@ -20,6 +20,9 @@ if __name__ == "__main__":
         entry_points={
             "console_scripts": [
                 "hello-world = timmins:hello_world",
+            ],
+            "gui_scripts": [
+                "hello-world = timmins:hello_world",
             ]
         },
     )
