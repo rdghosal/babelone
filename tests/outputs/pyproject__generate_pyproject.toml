@@ -5,3 +5,9 @@ dependencies = [
     "pydantic==2.x",
     "flask",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "hypothesis>=6.98.1",
+]

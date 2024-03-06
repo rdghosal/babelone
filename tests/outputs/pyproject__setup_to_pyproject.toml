@@ -5,3 +5,13 @@ dependencies = [
     "pydantic==2.6.2",
     "fastapi",
 ]
+
+[project.optional-dependencies]
+PDF = [
+    "ReportLab>=1.2",
+    "RXP",
+]
+dev = [
+    "pytest",
+    "hypothesis>=6.95.x",
+]

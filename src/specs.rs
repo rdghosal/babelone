@@ -44,25 +44,31 @@ pub struct PyProject {
 pub struct BuildSystem {
     #[serde(rename = "build-backend")]
     pub build_backend: Option<String>,
-    pub requires: Option<Vec<String>>,
+    pub requires: Option<Vec<Requirement>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Project {
     pub name: Option<String>,
     pub version: Option<String>,
-    pub dependencies: Option<Vec<String>>,
+    pub dependencies: Option<Vec<Requirement>>,
+    #[serde(rename = "optional-dependencies")]
+    pub optional_dependencies: Option<BTreeMap<String, Vec<Requirement>>>,
 }
 
 impl Requirements {
     pub fn from_setup(setup: Setup) -> Self {
-        // TODO: handle extra_requires.
         let mut requires = Vec::<String>::new();
         if let Some(mut install_requires) = setup.install_requires {
             requires.append(&mut install_requires);
         }
         if let Some(mut setup_requires) = setup.setup_requires {
             requires.append(&mut setup_requires);
+        }
+        if let Some(mut extra_requires) = setup.extra_requires {
+            for mut extra_require in extra_requires.values_mut() {
+                requires.append(&mut extra_require);
+            }
         }
         Self { requires }
     }
@@ -96,13 +102,18 @@ impl Setup {
     }
 
     pub fn from_pyproject(pyproject: PyProject) -> Self {
-        // TODO: handle extra_requires
-        let (package_name, version, install_requires) = if pyproject.project.is_some() {
-            let project = pyproject.project.unwrap();
-            (project.name, project.version, project.dependencies)
-        } else {
-            (None, None, None)
-        };
+        let (package_name, version, install_requires, extra_requires) =
+            if pyproject.project.is_some() {
+                let project = pyproject.project.unwrap();
+                (
+                    project.name,
+                    project.version,
+                    project.dependencies,
+                    project.optional_dependencies,
+                )
+            } else {
+                (None, None, None, None)
+            };
         let setup_requires = if pyproject.build_system.is_some() {
             let build_system = pyproject.build_system.unwrap();
             build_system.requires
@@ -114,7 +125,7 @@ impl Setup {
             version,
             install_requires,
             setup_requires,
-            extra_requires: None,
+            extra_requires,
         }
     }
 }
@@ -125,6 +136,7 @@ impl PyProject {
         let project = Some(Project {
             name: None,
             version: None,
+            optional_dependencies: None,
             dependencies,
         });
         Self {
@@ -138,6 +150,7 @@ impl PyProject {
         let version = setup.version;
         let dependencies = setup.install_requires;
         let requires = setup.setup_requires;
+        let optional_dependencies = setup.extra_requires;
         let build_system = if requires.is_some() {
             Some(BuildSystem {
                 requires,
@@ -150,6 +163,7 @@ impl PyProject {
             name,
             version,
             dependencies,
+            optional_dependencies,
         });
         Self {
             project,

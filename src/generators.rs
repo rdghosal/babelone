@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs;
 use std::path::Path;
@@ -37,7 +38,6 @@ impl SpecGenerator<Setup> for SetupGenerator {
             docstring_end
         );
         let imports = "from setuptools import setup";
-        // TODO: handle extra_requires>
         let setup_call = format!(
             r#"
     setup(
@@ -45,6 +45,7 @@ impl SpecGenerator<Setup> for SetupGenerator {
         version={:#?},
         install_requires={:?},
         setup_requires={:?},
+        extra_requires={:?},
     )"#,
             spec.package_name.as_ref().unwrap_or(&String::new()),
             spec.version.as_ref().unwrap_or(&String::new()),
@@ -53,7 +54,10 @@ impl SpecGenerator<Setup> for SetupGenerator {
                 .unwrap_or(&Vec::<String>::new()),
             spec.setup_requires
                 .as_ref()
-                .unwrap_or(&Vec::<String>::new())
+                .unwrap_or(&Vec::<String>::new()),
+            spec.extra_requires
+                .as_ref()
+                .unwrap_or(&BTreeMap::<String, Vec::<String>>::new())
         );
         let entrypoint = r#"if __name__ == "__main__":"#;
         contents.push_str(&docstring);
@@ -106,7 +110,10 @@ mod tests {
         let spec = Setup {
             package_name: Some("babelone-test".to_string()),
             version: Some("v0.1.1".to_string()),
-            extra_requires: None,
+            extra_requires: Some(BTreeMap::from([(
+                "dev".to_string(),
+                vec!["pytest".to_string(), "hypothesis>=6.98.1".to_string()],
+            )])),
             install_requires: Some(vec!["flask".to_string(), "pydantic==2.6.1".to_string()]),
             setup_requires: None,
         };
@@ -127,6 +134,10 @@ mod tests {
                 name: Some("test".to_string()),
                 version: Some("2.1".to_string()),
                 dependencies: Some(vec!["pydantic==2.x".to_string(), "flask".to_string()]),
+                optional_dependencies: Some(BTreeMap::from([(
+                    "dev".to_string(),
+                    vec!["pytest".to_string(), "hypothesis>=6.98.1".to_string()],
+                )])),
             }),
             build_system: None,
         };

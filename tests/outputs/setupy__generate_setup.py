@@ -8,4 +8,5 @@ if __name__ == "__main__":
         version="v0.1.1",
         install_requires=["flask", "pydantic==2.6.1"],
         setup_requires=[],
+        extra_requires={"dev": ["pytest", "hypothesis>=6.98.1"]},
     )
