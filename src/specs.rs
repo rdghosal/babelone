@@ -1,10 +1,7 @@
 //! Models encapsulating Python package build specifications.
-use std::{collections::BTreeMap, fmt};
-
-use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::{collections::BTreeMap, default::Default, fmt};
 
-#[pyclass]
 pub enum PyBuildSpec {
     Requirements,
     Setup,
@@ -18,12 +15,12 @@ pub enum PyBuildSpec {
 pub type Requirement = String;
 
 /// Encapsulates build requirements defined in a requirements.txt (or similar file).
+#[derive(Default)]
 pub struct Requirements {
     pub requires: Vec<Requirement>,
 }
 
 /// Encapsulates build specifications defined in a setup.py file.
-#[derive(Debug)]
 pub struct Setup {
     pub package_name: Option<String>,
     pub version: Option<String>,
@@ -171,12 +168,37 @@ impl Setup {
     }
 }
 
+impl Default for Setup {
+    fn default() -> Self {
+        Self {
+            package_name: Some(String::default()),
+            version: Some(String::default()),
+            entry_points: Some(Entrypoints::default()),
+            extra_requires: Some(BTreeMap::default()),
+            install_requires: Some(Vec::default()),
+            setup_requires: Some(Vec::default()),
+        }
+    }
+}
+
+impl Default for Entrypoints {
+    fn default() -> Self {
+        Self {
+            console_scripts: Some(Vec::default()),
+            gui_scripts: Some(Vec::default()),
+        }
+    }
+}
+
 impl fmt::Debug for Entrypoints {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_map()
             .entry(
                 &"console_scripts",
-                &self.console_scripts.as_ref().unwrap_or(&Vec::<String>::new()),
+                &self
+                    .console_scripts
+                    .as_ref()
+                    .unwrap_or(&Vec::<String>::new()),
             )
             .entry(
                 &"gui_scripts",
@@ -253,6 +275,37 @@ impl PyProject {
         Self {
             project,
             build_system,
+        }
+    }
+}
+
+impl Default for PyProject {
+    fn default() -> Self {
+        Self {
+            project: Some(Project::default()),
+            build_system: Some(BuildSystem::default()),
+        }
+    }
+}
+
+impl Default for Project {
+    fn default() -> Self {
+        Self {
+            name: Some(String::default()),
+            version: Some(String::new()),
+            dependencies: Some(Vec::new()),
+            optional_dependencies: Some(BTreeMap::default()),
+            project_scripts: Some(BTreeMap::default()),
+            project_gui_scripts: Some(BTreeMap::default()),
+        }
+    }
+}
+
+impl Default for BuildSystem {
+    fn default() -> Self {
+        Self {
+            build_backend: Some(String::default()),
+            requires: Some(Vec::default()),
         }
     }
 }

@@ -28,13 +28,13 @@ impl SpecGenerator<Requirements> for RequirementsGenerator {
 impl SpecGenerator<Setup> for SetupGenerator {
     fn make_file(path: &Path, spec: &Setup) -> Result<(), Box<dyn Error>> {
         let mut contents = String::new();
-        let docstring_end = if spec.package_name.is_some() {
-            format!("for {}", &spec.package_name.as_ref().unwrap())
+        let docstring_end = if spec.package_name.as_ref().is_some_and(|s| !s.is_empty()) {
+            format!(" for {}", &spec.package_name.as_ref().unwrap())
         } else {
             String::new()
         };
         let docstring = format!(
-            r#""""Installation configuration and package metadata {}.""""#,
+            r#""""Installation configuration and package metadata{}.""""#,
             docstring_end
         );
         let imports = "from setuptools import setup";

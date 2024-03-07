@@ -30,6 +30,30 @@ fn get_spec_type(path: &Path) -> PyResult<specs::PyBuildSpec> {
     ));
 }
 
+/// Scaffolds a build specification file.
+#[pyfunction]
+fn create(destination: String) -> PyResult<()> {
+    let destination = Path::new(&destination);
+    let dest_type = get_spec_type(&destination)?;
+    match dest_type {
+        specs::PyBuildSpec::Requirements => {
+            let requirements = specs::Requirements::default();
+            let _ = generators::RequirementsGenerator::make_file(&destination, &requirements);
+            Ok(())
+        }
+        specs::PyBuildSpec::Setup => {
+            let setup = specs::Setup::default();
+            let _ = generators::SetupGenerator::make_file(&destination, &setup);
+            Ok(())
+        }
+        specs::PyBuildSpec::PyProject => {
+            let pyproject = specs::PyProject::default();
+            let _ = generators::PyProjectGenerator::make_file(&destination, &pyproject);
+            Ok(())
+        }
+    }
+}
+
 /// Transpiles a source Python package build specification file (e.g., setup.py)
 /// to another (e.g., pyproject.toml).
 #[pyfunction]
@@ -76,13 +100,14 @@ fn translate(source: String, destination: String) -> PyResult<()> {
             let _ = generators::RequirementsGenerator::make_file(&destination, &requirements);
             Ok(())
         }
-        _ => Err(PyNotImplementedError::new_err("Failed to perform operation. Only conversions between setup.py and pyproject.toml are allowed.")),
+        _ => Err(PyNotImplementedError::new_err("Failed to perform operation. Only unique conversions between requirements.txt, setup.py and pyproject.toml are allowed.")),
     }
 }
 
 /// A Python module implemented in Rust.
 #[pymodule]
 fn _babelone_core(_py: Python, m: &PyModule) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(create, m)?)?;
     m.add_function(wrap_pyfunction!(translate, m)?)?;
     Ok(())
 }
