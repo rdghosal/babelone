@@ -27,5 +27,9 @@ pip install babelone
 ```bash
 babelone --help
 
-babelone <path>/[requirements.txt|setup.py|pyproject.toml] <path>/[requirements.txt|setup.py|pyproject.toml]
+# Option 1: Scaffold a build spec.
+babelone create <path>/[requirements.txt|setup.py|pyproject.toml]
+
+# Option 2: Translate between build specs.
+babelone translate <path>/[requirements.txt|setup.py|pyproject.toml] <path>/[requirements.txt|setup.py|pyproject.toml]
 ```
