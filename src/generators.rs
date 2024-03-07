@@ -13,6 +13,10 @@ pub trait SpecGenerator<T> {
     fn make_file(path: &Path, spec: &T) -> Result<(), Box<dyn Error>>;
 }
 
+trait SetupKwarg { 
+    fn as_kwarg_string(&self, kw: &str) -> String;
+}
+
 impl SpecGenerator<Requirements> for RequirementsGenerator {
     fn make_file(path: &Path, spec: &Requirements) -> Result<(), Box<dyn Error>> {
         let mut contents = String::new();
@@ -38,41 +42,69 @@ impl SpecGenerator<Setup> for SetupGenerator {
             docstring_end
         );
         let imports = "from setuptools import setup";
-        let setup_call = format!(
-            r#"
-    setup(
-        package_name={:#?},
-        version={:#?},
-        install_requires={:?},
-        setup_requires={:?},
-        extra_requires={:?},
-        entry_points={:?},
-    )"#,
-            spec.package_name.as_ref().unwrap_or(&String::new()),
-            spec.version.as_ref().unwrap_or(&String::new()),
-            spec.install_requires
-                .as_ref()
-                .unwrap_or(&Vec::<String>::new()),
-            spec.setup_requires
-                .as_ref()
-                .unwrap_or(&Vec::<String>::new()),
-            spec.extra_requires
-                .as_ref()
-                .unwrap_or(&BTreeMap::<String, Vec::<String>>::new()),
-            spec.entry_points.as_ref().unwrap_or(&Entrypoints {
-                console_scripts: Some(Vec::<String>::new()),
-                gui_scripts: Some(Vec::<String>::new())
-            })
-        );
+        let mut setup_call = String::from("    setup(\n");
+        let kwargs: Vec<String> = vec![
+            spec.package_name.as_kwarg_string("package_name"),
+            spec.version.as_kwarg_string("version"),
+            spec.install_requires.as_kwarg_string("install_requires"),
+            spec.setup_requires.as_kwarg_string("setup_requires"),
+            spec.extra_requires.as_kwarg_string("extra_requires"),
+            spec.entry_points.as_kwarg_string("entry_points"),
+        ];
+        for kwarg in kwargs.iter() {
+            if kwarg.is_empty() {
+                continue;
+            }
+            let formatted = format!("        {},\n", kwarg);
+            setup_call.push_str(&formatted);
+        }
+        setup_call.push_str("    )");
         let entrypoint = r#"if __name__ == "__main__":"#;
         contents.push_str(&docstring);
         contents.push_str("\n");
         contents.push_str(&imports);
         contents.push_str("\n\n\n");
         contents.push_str(&entrypoint);
+        contents.push_str("\n");
         contents.push_str(&setup_call);
         fs::write(path, contents)?;
         Ok(())
+    }
+}
+
+impl SetupKwarg for Option<String> {
+    fn as_kwarg_string(&self, kw: &str) -> String {
+        match self {
+            Some(s) => format!("{}={:#?}", kw, s),
+            None => String::new(),
+        }
+    }
+}
+
+impl SetupKwarg for Option<Vec<String>> {
+    fn as_kwarg_string(&self, kw: &str) -> String {
+        match self {
+            Some(s) => format!("{}={:?}", kw, s),
+            None => String::new(),
+        }
+    }
+}
+
+impl SetupKwarg for Option<BTreeMap<String, Vec<Requirement>>> {
+    fn as_kwarg_string(&self, kw: &str) -> String {
+        match self {
+            Some(s) => format!("{}={:?}", kw, s),
+            None => String::new(),
+        }
+    }
+}
+
+impl SetupKwarg for Option<Entrypoints> {
+    fn as_kwarg_string(&self, kw: &str) -> String {
+        match self {
+            Some(s) => format!("{}={:?}", kw, s),
+            None => String::new(),
+        }
     }
 }
 
