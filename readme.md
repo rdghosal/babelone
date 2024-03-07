@@ -6,7 +6,7 @@
 
 It's a Python CLI, built in Rust, that can convert between requirements.txt, setup.py, or pyproject.toml as well as scaffold one of such files to get your project started.
 
-babelone was built to help you sort out all your package build spec files (or at least for inital scaffolding), because—let's face it—it can sometimes be a pain in the you-know-what.
+babelone was built to help you sort out all your package build spec files, because—let's face it—it can sometimes be a pain in the you-know-what.
 
 ## Python CLI Built in Rust?
 
