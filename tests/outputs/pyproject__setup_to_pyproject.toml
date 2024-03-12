@@ -7,13 +7,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = [
-    "pytest",
-    "hypothesis>=6.95.x",
-]
 PDF = [
     "ReportLab>=1.2",
     "RXP",
+]
+dev = [
+    "pytest",
+    "hypothesis>=6.95.x",
 ]
 
 [project.scripts]

@@ -1,6 +1,6 @@
 use pyo3::exceptions::PyOSError;
 use pyo3::PyResult;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
@@ -91,7 +91,7 @@ impl SetupKwarg for Option<Vec<String>> {
     }
 }
 
-impl SetupKwarg for Option<HashMap<String, Vec<Requirement>>> {
+impl SetupKwarg for Option<BTreeMap<String, Vec<Requirement>>> {
     fn as_kwarg_string(&self, kw: &str) -> String {
         match self {
             Some(s) => format!("{}={:?}", kw, s),
@@ -154,7 +154,7 @@ mod tests {
         let spec = Setup {
             package_name: Some("babelone-test".to_string()),
             version: Some("v0.1.1".to_string()),
-            extra_requires: Some(HashMap::from([(
+            extra_requires: Some(BTreeMap::from([(
                 "dev".to_string(),
                 vec!["pytest".to_string(), "hypothesis>=6.98.1".to_string()],
             )])),
@@ -182,7 +182,7 @@ mod tests {
                 name: Some("test".to_string()),
                 version: Some("2.1".to_string()),
                 dependencies: Some(vec!["pydantic==2.x".to_string(), "flask".to_string()]),
-                optional_dependencies: Some(HashMap::from([(
+                optional_dependencies: Some(BTreeMap::from([(
                     "dev".to_string(),
                     vec!["pytest".to_string(), "hypothesis>=6.98.1".to_string()],
                 )])),

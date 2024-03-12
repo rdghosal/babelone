@@ -4,7 +4,7 @@
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::PyResult;
 use rustpython_parser::{ast, Parse};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use crate::specs::*;
@@ -89,13 +89,13 @@ impl SpecParser<PyProject> for PyProjectParser {
 
 impl SetupParser {
     fn parse_ast(statements: Vec<ast::Stmt>) -> PyResult<Setup> {
-        let mut assignments = HashMap::<String, ast::Expr>::new();
+        let mut assignments = BTreeMap::<String, ast::Expr>::new();
 
         let mut package_name: Option<String> = None;
         let mut version: Option<String> = None;
         let mut install_requires: Option<Vec<Requirement>> = None;
         let mut setup_requires: Option<Vec<Requirement>> = None;
-        let mut extra_requires: Option<HashMap<String, Vec<Requirement>>> = None;
+        let mut extra_requires: Option<BTreeMap<String, Vec<Requirement>>> = None;
         let mut entry_points: Option<Entrypoints> = None;
 
         if let Some((setup, assignments)) =
@@ -139,7 +139,7 @@ impl SetupParser {
 
     fn parse_string(
         expr: &ast::Expr,
-        assignments: &HashMap<String, ast::Expr>,
+        assignments: &BTreeMap<String, ast::Expr>,
     ) -> PyResult<String> {
         match expr {
             ast::Expr::Constant(c) => {
@@ -172,7 +172,7 @@ impl SetupParser {
 
     fn parse_string_vec(
         expr: &ast::Expr,
-        assignments: &HashMap<String, ast::Expr>,
+        assignments: &BTreeMap<String, ast::Expr>,
     ) -> PyResult<Vec<String>> {
         match expr {
             ast::Expr::List(list) => {
@@ -196,9 +196,9 @@ impl SetupParser {
 
     fn parse_requires_map(
         expr: &ast::Expr,
-        assignments: &HashMap<String, ast::Expr>,
-    ) -> PyResult<HashMap<String, Vec<Requirement>>> {
-        let mut mapped = HashMap::<String, Vec<Requirement>>::new();
+        assignments: &BTreeMap<String, ast::Expr>,
+    ) -> PyResult<BTreeMap<String, Vec<Requirement>>> {
+        let mut mapped = BTreeMap::<String, Vec<Requirement>>::new();
         match expr {
             ast::Expr::Dict(dict) => {
                 for (i, key) in dict.keys.iter().enumerate() {
@@ -220,13 +220,13 @@ impl SetupParser {
             _ => (),
         }
         return Err(PyValueError::new_err(format!(
-            "Failed to parse HashMap<String, Vec<String>> from Expr:\n{expr:#?}"
+            "Failed to parse BTreeMap<String, Vec<String>> from Expr:\n{expr:#?}"
         )));
     }
 
     fn parse_entrypoints(
         expr: &ast::Expr,
-        assignments: &HashMap<String, ast::Expr>,
+        assignments: &BTreeMap<String, ast::Expr>,
     ) -> PyResult<Entrypoints> {
         match expr {
             ast::Expr::Dict(dict) => {
@@ -265,8 +265,8 @@ impl SetupParser {
     fn get_setup_call<'a>(
         statements: &'a Vec<ast::Stmt>,
         idx: &mut usize,
-        assignments: &'a mut HashMap<String, ast::Expr>,
-    ) -> PyResult<Option<(&'a ast::ExprCall, &'a mut HashMap<String, ast::Expr>)>> {
+        assignments: &'a mut BTreeMap<String, ast::Expr>,
+    ) -> PyResult<Option<(&'a ast::ExprCall, &'a mut BTreeMap<String, ast::Expr>)>> {
         if *idx < statements.len() {
             match &statements[*idx] {
                 ast::Stmt::Assign(assignment) => {
@@ -299,7 +299,7 @@ impl SetupParser {
     }
 }
 
-impl IdentValueMap for HashMap<String, ast::Expr> {
+impl IdentValueMap for BTreeMap<String, ast::Expr> {
     fn insert_assignments(&mut self, assignment: PyAssignment) -> PyResult<&mut Self> {
         match assignment {
             PyAssignment::Unannotated(assignment) => {
@@ -352,7 +352,7 @@ mod test {
         assert_eq!(s.version, Some("2.0".to_string()));
         assert_eq!(
             s.extra_requires,
-            Some(HashMap::<String, Vec<Requirement>>::from([
+            Some(BTreeMap::<String, Vec<Requirement>>::from([
                 (
                     "dev".to_string(),
                     vec!["pytest".to_string(), "hypothesis>=6.95.x".to_string()]
