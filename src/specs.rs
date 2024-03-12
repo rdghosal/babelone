@@ -1,6 +1,6 @@
 //! Models encapsulating Python package build specifications.
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, default::Default, fmt};
+use std::{collections::HashMap, default::Default, fmt};
 
 pub enum PyBuildSpec {
     Requirements,
@@ -24,7 +24,7 @@ pub struct Requirements {
 pub struct Setup {
     pub package_name: Option<String>,
     pub version: Option<String>,
-    pub extra_requires: Option<BTreeMap<String, Vec<Requirement>>>,
+    pub extra_requires: Option<HashMap<String, Vec<Requirement>>>,
     pub install_requires: Option<Vec<Requirement>>,
     pub setup_requires: Option<Vec<Requirement>>,
     pub entry_points: Option<Entrypoints>,
@@ -56,11 +56,11 @@ pub struct Project {
     pub version: Option<String>,
     pub dependencies: Option<Vec<Requirement>>,
     #[serde(rename = "optional-dependencies")]
-    pub optional_dependencies: Option<BTreeMap<String, Vec<Requirement>>>,
+    pub optional_dependencies: Option<HashMap<String, Vec<Requirement>>>,
     #[serde(rename = "scripts")]
-    pub project_scripts: Option<BTreeMap<String, String>>,
+    pub project_scripts: Option<HashMap<String, String>>,
     #[serde(rename = "gui-scripts")]
-    pub project_gui_scripts: Option<BTreeMap<String, String>>,
+    pub project_gui_scripts: Option<HashMap<String, String>>,
 }
 
 impl Requirements {
@@ -174,7 +174,7 @@ impl Default for Setup {
             package_name: Some(String::default()),
             version: Some(String::default()),
             entry_points: Some(Entrypoints::default()),
-            extra_requires: Some(BTreeMap::default()),
+            extra_requires: Some(HashMap::default()),
             install_requires: Some(Vec::default()),
             setup_requires: Some(Vec::default()),
         }
@@ -240,11 +240,11 @@ impl PyProject {
         } else {
             None
         };
-        let mut project_scripts: Option<BTreeMap<String, String>> = None;
-        let mut project_gui_scripts: Option<BTreeMap<String, String>> = None;
+        let mut project_scripts: Option<HashMap<String, String>> = None;
+        let mut project_gui_scripts: Option<HashMap<String, String>> = None;
         if let Some(entry_points) = setup.entry_points {
             if let Some(console_scripts) = entry_points.console_scripts {
-                let mut scripts = BTreeMap::<String, String>::new();
+                let mut scripts = HashMap::<String, String>::new();
                 for console_script in console_scripts.iter() {
                     let mut key_and_path = console_script.split('=').map(|s| s.trim().to_string());
                     scripts.insert(key_and_path.next().unwrap(), key_and_path.next().unwrap());
@@ -254,7 +254,7 @@ impl PyProject {
                 }
             }
             if let Some(gui_scripts) = entry_points.gui_scripts {
-                let mut scripts = BTreeMap::<String, String>::new();
+                let mut scripts = HashMap::<String, String>::new();
                 for gui_script in gui_scripts.iter() {
                     let mut key_and_path = gui_script.split('=').map(|s| s.trim().to_string());
                     scripts.insert(key_and_path.next().unwrap(), key_and_path.next().unwrap());
@@ -294,9 +294,9 @@ impl Default for Project {
             name: Some(String::default()),
             version: Some(String::new()),
             dependencies: Some(Vec::new()),
-            optional_dependencies: Some(BTreeMap::default()),
-            project_scripts: Some(BTreeMap::default()),
-            project_gui_scripts: Some(BTreeMap::default()),
+            optional_dependencies: Some(HashMap::default()),
+            project_scripts: Some(HashMap::default()),
+            project_gui_scripts: Some(HashMap::default()),
         }
     }
 }

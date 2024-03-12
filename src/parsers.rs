@@ -4,7 +4,8 @@
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::PyResult;
 use rustpython_parser::{ast, Parse};
-use std::{collections::BTreeMap, path::Path};
+use std::collections::HashMap;
+use std::path::Path;
 
 use crate::specs::*;
 use crate::utils;
@@ -25,20 +26,17 @@ pub trait SpecParser<T> {
         Self: Sized;
 }
 
-trait PyStr {
-    fn to_string(&self) -> PyResult<String>;
-}
-
-trait PyIdent {
-    fn as_ident(&self) -> PyResult<String>;
-}
-
-trait PyStrList {
-    fn to_string_vec(&self) -> PyResult<Vec<String>>;
-}
-
 trait IdentValueMap {
     fn insert_assignments(&mut self, assignment: PyAssignment) -> PyResult<&mut Self>;
+
+    fn parse_ident(expr: &ast::Expr) -> PyResult<String> {
+        match expr {
+            ast::Expr::Name(e) => Ok(e.id.to_string()),
+            _ => Err(PyTypeError::new_err(format!(
+                "Expected Expr::Name in assignment parsing. Found:\n{expr:#?}"
+            ))),
+        }
+    }
 }
 
 impl SpecParser<Requirements> for RequirementsParser {
@@ -91,13 +89,13 @@ impl SpecParser<PyProject> for PyProjectParser {
 
 impl SetupParser {
     fn parse_ast(statements: Vec<ast::Stmt>) -> PyResult<Setup> {
-        let mut assignments = BTreeMap::<String, ast::Expr>::new();
+        let mut assignments = HashMap::<String, ast::Expr>::new();
 
         let mut package_name: Option<String> = None;
         let mut version: Option<String> = None;
         let mut install_requires: Option<Vec<Requirement>> = None;
         let mut setup_requires: Option<Vec<Requirement>> = None;
-        let mut extra_requires: Option<BTreeMap<String, Vec<Requirement>>> = None;
+        let mut extra_requires: Option<HashMap<String, Vec<Requirement>>> = None;
         let mut entry_points: Option<Entrypoints> = None;
 
         if let Some((setup, assignments)) =
@@ -141,15 +139,17 @@ impl SetupParser {
 
     fn parse_string(
         expr: &ast::Expr,
-        assignments: &BTreeMap<String, ast::Expr>,
+        assignments: &HashMap<String, ast::Expr>,
     ) -> PyResult<String> {
         match expr {
-            ast::Expr::Constant(_) => {
-                return Ok(expr.to_string()?);
+            ast::Expr::Constant(c) => {
+                if let ast::Constant::Str(s) = &c.value {
+                    return Ok(s.clone());
+                }
             }
             ast::Expr::Name(name) => {
                 if let Some(v) = assignments.get(&name.id.to_string()) {
-                    return Ok(v.to_string()?);
+                    return Ok(Self::parse_string(v, assignments)?);
                 }
             }
             ast::Expr::JoinedStr(joined) => {
@@ -172,15 +172,19 @@ impl SetupParser {
 
     fn parse_string_vec(
         expr: &ast::Expr,
-        assignments: &BTreeMap<String, ast::Expr>,
+        assignments: &HashMap<String, ast::Expr>,
     ) -> PyResult<Vec<String>> {
         match expr {
-            ast::Expr::List(_) => {
-                return Ok(expr.to_string_vec()?);
+            ast::Expr::List(list) => {
+                let mut result = Vec::<String>::new();
+                for element in &list.elts {
+                    result.push(Self::parse_string(element, assignments)?);
+                }
+                return Ok(result);
             }
             ast::Expr::Name(name) => {
                 if let Some(v) = assignments.get(&name.id.to_string()) {
-                    return Ok(v.to_string_vec()?);
+                    return Self::parse_string_vec(v, assignments);
                 }
             }
             _ => (),
@@ -192,16 +196,16 @@ impl SetupParser {
 
     fn parse_requires_map(
         expr: &ast::Expr,
-        assignments: &BTreeMap<String, ast::Expr>,
-    ) -> PyResult<BTreeMap<String, Vec<Requirement>>> {
-        let mut mapped = BTreeMap::<String, Vec<Requirement>>::new();
+        assignments: &HashMap<String, ast::Expr>,
+    ) -> PyResult<HashMap<String, Vec<Requirement>>> {
+        let mut mapped = HashMap::<String, Vec<Requirement>>::new();
         match expr {
             ast::Expr::Dict(dict) => {
                 for (i, key) in dict.keys.iter().enumerate() {
                     if let Some(key) = key {
                         let value = &dict.values[i];
                         mapped.insert(
-                            key.to_string()?,
+                            Self::parse_string(key, assignments)?,
                             Self::parse_string_vec(value, assignments)?,
                         );
                     }
@@ -216,13 +220,13 @@ impl SetupParser {
             _ => (),
         }
         return Err(PyValueError::new_err(format!(
-            "Failed to parse BTreeMap<String, Vec<String>> from Expr:\n{expr:#?}"
+            "Failed to parse HashMap<String, Vec<String>> from Expr:\n{expr:#?}"
         )));
     }
 
     fn parse_entrypoints(
         expr: &ast::Expr,
-        assignments: &BTreeMap<String, ast::Expr>,
+        assignments: &HashMap<String, ast::Expr>,
     ) -> PyResult<Entrypoints> {
         match expr {
             ast::Expr::Dict(dict) => {
@@ -232,11 +236,13 @@ impl SetupParser {
                 };
                 for (i, key) in dict.keys.iter().enumerate() {
                     if let Some(key) = key {
-                        let key = key.to_string()?;
+                        let key = Self::parse_string(key, assignments)?;
                         if key == "console_scripts".to_string() {
-                            entry_points.console_scripts = Some(dict.values[i].to_string_vec()?);
+                            entry_points.console_scripts =
+                                Some(Self::parse_string_vec(&dict.values[i], assignments)?);
                         } else if key == "gui_scripts".to_string() {
-                            entry_points.gui_scripts = Some(dict.values[i].to_string_vec()?);
+                            entry_points.gui_scripts =
+                                Some(Self::parse_string_vec(&dict.values[i], assignments)?);
                         }
                     }
                 }
@@ -259,8 +265,8 @@ impl SetupParser {
     fn get_setup_call<'a>(
         statements: &'a Vec<ast::Stmt>,
         idx: &mut usize,
-        assignments: &'a mut BTreeMap<String, ast::Expr>,
-    ) -> PyResult<Option<(&'a ast::ExprCall, &'a mut BTreeMap<String, ast::Expr>)>> {
+        assignments: &'a mut HashMap<String, ast::Expr>,
+    ) -> PyResult<Option<(&'a ast::ExprCall, &'a mut HashMap<String, ast::Expr>)>> {
         if *idx < statements.len() {
             match &statements[*idx] {
                 ast::Stmt::Assign(assignment) => {
@@ -293,56 +299,13 @@ impl SetupParser {
     }
 }
 
-impl PyStr for ast::Expr {
-    fn to_string(&self) -> PyResult<String> {
-        if let ast::Expr::Constant(c) = &self {
-            if let ast::Constant::Str(s) = &c.value {
-                return Ok(s.clone());
-            }
-        }
-        return Err(PyValueError::new_err(format!(
-            "Failed to parse String from Expr:\n{self:#?}"
-        )));
-    }
-}
-
-impl PyIdent for ast::Expr {
-    fn as_ident(&self) -> PyResult<String> {
-        match self {
-            ast::Expr::Name(e) => Ok(e.id.to_string()),
-            _ => Err(PyTypeError::new_err(format!(
-                "Expected Expr::Name in assignment parsing. Found:\n{self:#?}"
-            ))),
-        }
-    }
-}
-
-impl PyStrList for ast::Expr {
-    fn to_string_vec(&self) -> PyResult<Vec<String>> {
-        if let ast::Expr::List(list) = &self {
-            let mut result = Vec::<String>::new();
-            for element in &list.elts {
-                if let ast::Expr::Constant(c) = element {
-                    if let ast::Constant::Str(s) = &c.value {
-                        result.push(s.clone());
-                    }
-                }
-            }
-            return Ok(result);
-        }
-        return Err(PyValueError::new_err(format!(
-            "Failed to parse Vec<String> from Expr:\n{self:#?}"
-        )));
-    }
-}
-
-impl IdentValueMap for BTreeMap<String, ast::Expr> {
+impl IdentValueMap for HashMap<String, ast::Expr> {
     fn insert_assignments(&mut self, assignment: PyAssignment) -> PyResult<&mut Self> {
         match assignment {
             PyAssignment::Unannotated(assignment) => {
                 let mut identifiers = Vec::<String>::new();
                 for target in assignment.targets.iter() {
-                    identifiers.push(target.as_ident()?);
+                    identifiers.push(Self::parse_ident(target)?);
                 }
                 for identifier in identifiers {
                     self.insert(identifier, *assignment.value.clone());
@@ -351,7 +314,7 @@ impl IdentValueMap for BTreeMap<String, ast::Expr> {
             PyAssignment::Annotated(assignment) => {
                 let target = &assignment.target;
                 if let Some(value) = &assignment.value {
-                    self.insert(target.as_ident()?, *value.clone());
+                    self.insert(Self::parse_ident(target)?, *value.clone());
                 }
             }
         }
@@ -385,11 +348,11 @@ mod test {
         let path_str = format!("{}/tests/inputs/setup.py", curr_dir.to_str().unwrap());
         let path = Path::new(&path_str);
         let s = SetupParser::from_file(&path).unwrap();
-        assert_eq!(s.package_name, Some("babelone-test-app".to_string()));
+        assert_eq!(s.package_name, Some("hello-world-app".to_string()));
         assert_eq!(s.version, Some("2.0".to_string()));
         assert_eq!(
             s.extra_requires,
-            Some(BTreeMap::<String, Vec<Requirement>>::from([
+            Some(HashMap::<String, Vec<Requirement>>::from([
                 (
                     "dev".to_string(),
                     vec!["pytest".to_string(), "hypothesis>=6.95.x".to_string()]

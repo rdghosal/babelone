@@ -1,6 +1,6 @@
 import setuptools
 
-PACKAGE = "babelone-test"
+PACKAGE = "hello-world"
 VERSION: str = "2.0"
 REQUIRES = [
     "pydantic==2.6.2",
@@ -20,7 +20,7 @@ if __name__ == "__main__":
         },
         entry_points={
             "console_scripts": [
-                "hello-world = timmins:hello_world",
+                f"{PACKAGE!r} = timmins:hello_world",
             ],
             "gui_scripts": [
                 "hello-world = timmins:hello_world",
