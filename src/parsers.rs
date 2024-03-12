@@ -143,9 +143,22 @@ impl SetupParser {
                     return Ok(v.to_string()?);
                 }
             }
+            ast::Expr::JoinedStr(joined) => {
+                let mut res = String::new();
+                for value in joined.values.iter() {
+                    let mut target = value;
+                    if let ast::Expr::FormattedValue(formatted) = value {
+                        target = formatted.value.as_ref();
+                    }
+                    res.push_str(&Self::parse_string(target, assignments)?);
+                }
+                return Ok(res);
+            }
             _ => (),
         }
-        return Err(PyValueError::new_err("Failed to parse Expr as String."));
+        return Err(PyValueError::new_err(
+            format!("Failed to parse Expr as String from {:#?}.", expr)
+        ));
     }
 
     fn parse_string_vec(
@@ -363,7 +376,7 @@ mod test {
         let path_str = format!("{}/tests/inputs/setup.py", curr_dir.to_str().unwrap());
         let path = Path::new(&path_str);
         let s = SetupParser::from_file(&path).unwrap();
-        assert_eq!(s.package_name, Some("babelone-test".to_string()));
+        assert_eq!(s.package_name, Some("babelone-test-app".to_string()));
         assert_eq!(s.version, Some("2.0".to_string()));
         assert_eq!(
             s.extra_requires,

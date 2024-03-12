@@ -1,5 +1,6 @@
 import setuptools
 
+PACKAGE = "babelone-test"
 VERSION: str = "2.0"
 REQUIRES = [
     "pydantic==2.6.2",
@@ -9,7 +10,7 @@ REQUIRES = [
 
 if __name__ == "__main__":
     setuptools.setup(
-        name="babelone-test",
+        name=f"{PACKAGE!s}-app",
         version=VERSION,
         author="Rahul D. Ghosal",
         install_requires=REQUIRES,
