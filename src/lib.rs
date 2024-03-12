@@ -63,7 +63,6 @@ fn translate(source: String, destination: String) -> PyResult<()> {
     let source_type = get_spec_type(&source)?;
     let dest_type = get_spec_type(&destination)?;
     match (source_type, dest_type) {
-        // TODO: Replace unwraps.
         (specs::PyBuildSpec::Requirements, specs::PyBuildSpec::PyProject) => {
             let requirements = parsers::RequirementsParser::from_file(&source)?;
             let pyproject = specs::PyProject::from_requirements(requirements);
