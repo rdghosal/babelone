@@ -38,17 +38,17 @@ fn create(destination: String) -> PyResult<()> {
     match dest_type {
         specs::PyBuildSpec::Requirements => {
             let requirements = specs::Requirements::default();
-            let _ = generators::RequirementsGenerator::make_file(&destination, &requirements);
+            generators::RequirementsGenerator::make_file(&destination, &requirements)?;
             Ok(())
         }
         specs::PyBuildSpec::Setup => {
             let setup = specs::Setup::default();
-            let _ = generators::SetupGenerator::make_file(&destination, &setup);
+            generators::SetupGenerator::make_file(&destination, &setup)?;
             Ok(())
         }
         specs::PyBuildSpec::PyProject => {
             let pyproject = specs::PyProject::default();
-            let _ = generators::PyProjectGenerator::make_file(&destination, &pyproject);
+            generators::PyProjectGenerator::make_file(&destination, &pyproject)?;
             Ok(())
         }
     }
@@ -65,39 +65,39 @@ fn translate(source: String, destination: String) -> PyResult<()> {
     match (source_type, dest_type) {
         // TODO: Replace unwraps.
         (specs::PyBuildSpec::Requirements, specs::PyBuildSpec::PyProject) => {
-            let requirements = parsers::RequirementsParser::from_file(&source);
-            let pyproject = specs::PyProject::from_requirements(requirements.unwrap());
-            let _ = generators::PyProjectGenerator::make_file(&destination, &pyproject);
+            let requirements = parsers::RequirementsParser::from_file(&source)?;
+            let pyproject = specs::PyProject::from_requirements(requirements);
+            generators::PyProjectGenerator::make_file(&destination, &pyproject)?;
             Ok(())
         }
         (specs::PyBuildSpec::Setup, specs::PyBuildSpec::PyProject) => {
-            let setup = parsers::SetupParser::from_file(&source);
-            let pyproject = specs::PyProject::from_setup(setup.unwrap());
-            let _ = generators::PyProjectGenerator::make_file(&destination, &pyproject);
+            let setup = parsers::SetupParser::from_file(&source)?;
+            let pyproject = specs::PyProject::from_setup(setup);
+            generators::PyProjectGenerator::make_file(&destination, &pyproject)?;
             Ok(())
         }
         (specs::PyBuildSpec::Requirements, specs::PyBuildSpec::Setup) => {
-            let requirements = parsers::RequirementsParser::from_file(&source);
-            let setup = specs::Setup::from_requirements(requirements.unwrap());
-            let _ = generators::SetupGenerator::make_file(&destination, &setup);
+            let requirements = parsers::RequirementsParser::from_file(&source)?;
+            let setup = specs::Setup::from_requirements(requirements);
+            generators::SetupGenerator::make_file(&destination, &setup)?;
             Ok(())
         }
         (specs::PyBuildSpec::PyProject, specs::PyBuildSpec::Setup) => {
-            let pyproject = parsers::PyProjectParser::from_file(&source);
-            let setup = specs::Setup::from_pyproject(pyproject.unwrap());
-            let _ = generators::SetupGenerator::make_file(&destination, &setup);
+            let pyproject = parsers::PyProjectParser::from_file(&source)?;
+            let setup = specs::Setup::from_pyproject(pyproject);
+            generators::SetupGenerator::make_file(&destination, &setup)?;
             Ok(())
         }
         (specs::PyBuildSpec::Setup, specs::PyBuildSpec::Requirements) => {
-            let setup = parsers::SetupParser::from_file(&source);
-            let requirements = specs::Requirements::from_setup(setup.unwrap());
-            let _ = generators::RequirementsGenerator::make_file(&destination, &requirements);
+            let setup = parsers::SetupParser::from_file(&source)?;
+            let requirements = specs::Requirements::from_setup(setup);
+            generators::RequirementsGenerator::make_file(&destination, &requirements)?;
             Ok(())
         }
         (specs::PyBuildSpec::PyProject, specs::PyBuildSpec::Requirements) => {
-            let pyproject = parsers::PyProjectParser::from_file(&source);
-            let requirements = specs::Requirements::from_pyproject(pyproject.unwrap());
-            let _ = generators::RequirementsGenerator::make_file(&destination, &requirements);
+            let pyproject = parsers::PyProjectParser::from_file(&source)?;
+            let requirements = specs::Requirements::from_pyproject(pyproject);
+            generators::RequirementsGenerator::make_file(&destination, &requirements)?;
             Ok(())
         }
         _ => Err(PyNotImplementedError::new_err("Failed to perform operation. Only unique conversions between requirements.txt, setup.py and pyproject.toml are allowed.")),

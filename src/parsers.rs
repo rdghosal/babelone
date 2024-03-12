@@ -1,10 +1,10 @@
 //! Defines parsers used to exract Python package build specifications
 //! from applicable file types, e.g., requirements.txt, setup.py, and
 //! pyproject.toml
-use pyo3::exceptions::PyTypeError;
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyTypeError, PyValueError};
+use pyo3::PyResult;
 use rustpython_parser::{ast, Parse};
-use std::{collections::BTreeMap, error::Error, path::Path};
+use std::{collections::BTreeMap, path::Path};
 
 use crate::specs::*;
 use crate::utils;
@@ -20,29 +20,29 @@ enum PyAssignment<'a> {
 
 /// A build specification for a Python package, e.g., setup.py.
 pub trait SpecParser<T> {
-    fn from_file(path: &Path) -> Result<T, Box<dyn Error>>
+    fn from_file(path: &Path) -> PyResult<T>
     where
         Self: Sized;
 }
 
 trait PyStr {
-    fn to_string(&self) -> Result<String, pyo3::PyErr>;
+    fn to_string(&self) -> PyResult<String>;
 }
 
 trait PyIdent {
-    fn as_ident(&self) -> Result<String, pyo3::PyErr>;
+    fn as_ident(&self) -> PyResult<String>;
 }
 
 trait PyStrList {
-    fn to_string_vec(&self) -> Result<Vec<String>, pyo3::PyErr>;
+    fn to_string_vec(&self) -> PyResult<Vec<String>>;
 }
 
 trait IdentValueMap {
-    fn insert_assignments(&mut self, assignment: PyAssignment) -> pyo3::PyResult<&mut Self>;
+    fn insert_assignments(&mut self, assignment: PyAssignment) -> PyResult<&mut Self>;
 }
 
 impl SpecParser<Requirements> for RequirementsParser {
-    fn from_file(path: &Path) -> Result<Requirements, Box<dyn Error>> {
+    fn from_file(path: &Path) -> PyResult<Requirements> {
         let mut requires = Vec::<Requirement>::new();
         let lines = utils::read_file(&path)?;
         let lines = lines.split("\n").map(|s| s.to_string());
@@ -57,13 +57,41 @@ impl SpecParser<Requirements> for RequirementsParser {
 }
 
 impl SpecParser<Setup> for SetupParser {
-    fn from_file(path: &Path) -> Result<Setup, Box<dyn Error>>
+    fn from_file(path: &Path) -> PyResult<Setup>
     where
         Self: Sized,
     {
         let contents = utils::read_file(&path)?;
+        match ast::Suite::parse(&contents, &path.to_str().unwrap()) {
+            Ok(statements) => Ok(Self::parse_ast(statements)?),
+            Err(_) => Err(PyValueError::new_err(format!(
+                "Failed to parse AST of {:#?}",
+                path.to_str()
+            ))),
+        }
+    }
+}
+
+impl SpecParser<PyProject> for PyProjectParser {
+    fn from_file(path: &Path) -> PyResult<PyProject>
+    where
+        Self: Sized,
+    {
+        let contents = utils::read_file(&path)?;
+        let pyproject = toml::from_str::<PyProject>(&contents);
+        if pyproject.is_ok() {
+            return Ok(pyproject.unwrap());
+        }
+        Err(PyValueError::new_err(format!(
+            "Failed to parse toml file {:#?}",
+            path.to_str()
+        )))
+    }
+}
+
+impl SetupParser {
+    fn parse_ast(statements: Vec<ast::Stmt>) -> PyResult<Setup> {
         let mut assignments = BTreeMap::<String, ast::Expr>::new();
-        let statements = ast::Suite::parse(&contents, &path.to_str().unwrap())?;
 
         let mut package_name: Option<String> = None;
         let mut version: Option<String> = None;
@@ -95,17 +123,11 @@ impl SpecParser<Setup> for SetupParser {
                             Some(Self::parse_requires_map(&keyword.value, &assignments)?);
                     }
                     "entry_points" => {
-                        entry_points =
-                            Some(Self::parse_entrypoints(&keyword.value, &assignments)?);
+                        entry_points = Some(Self::parse_entrypoints(&keyword.value, &assignments)?);
                     }
                     _ => continue,
                 }
             }
-        }
-        if package_name.is_none() {
-            return Err(Box::new(PyValueError::new_err(
-                "package_name must be defined.",
-            )));
         }
         Ok(Setup {
             package_name,
@@ -116,24 +138,11 @@ impl SpecParser<Setup> for SetupParser {
             entry_points,
         })
     }
-}
 
-impl SpecParser<PyProject> for PyProjectParser {
-    fn from_file(path: &Path) -> Result<PyProject, Box<dyn Error>>
-    where
-        Self: Sized,
-    {
-        let contents = utils::read_file(&path)?;
-        let pyproject = toml::from_str::<PyProject>(&contents)?;
-        Ok(pyproject)
-    }
-}
-
-impl SetupParser {
     fn parse_string(
         expr: &ast::Expr,
         assignments: &BTreeMap<String, ast::Expr>,
-    ) -> Result<String, pyo3::PyErr> {
+    ) -> PyResult<String> {
         match expr {
             ast::Expr::Constant(_) => {
                 return Ok(expr.to_string()?);
@@ -156,15 +165,15 @@ impl SetupParser {
             }
             _ => (),
         }
-        return Err(PyValueError::new_err(
-            format!("Failed to parse Expr as String from {:#?}.", expr)
-        ));
+        return Err(PyValueError::new_err(format!(
+            "Failed to parse String from Expr:\n{expr:#?}",
+        )));
     }
 
     fn parse_string_vec(
         expr: &ast::Expr,
         assignments: &BTreeMap<String, ast::Expr>,
-    ) -> Result<Vec<String>, pyo3::PyErr> {
+    ) -> PyResult<Vec<String>> {
         match expr {
             ast::Expr::List(_) => {
                 return Ok(expr.to_string_vec()?);
@@ -176,15 +185,15 @@ impl SetupParser {
             }
             _ => (),
         }
-        return Err(PyValueError::new_err(
-            "Failed to parse Expr as Vec<String>.",
-        ));
+        return Err(PyValueError::new_err(format!(
+            "Failed to parse Vec<String> from Expr:\n{expr:#?}"
+        )));
     }
 
     fn parse_requires_map(
         expr: &ast::Expr,
         assignments: &BTreeMap<String, ast::Expr>,
-    ) -> Result<BTreeMap<String, Vec<Requirement>>, pyo3::PyErr> {
+    ) -> PyResult<BTreeMap<String, Vec<Requirement>>> {
         let mut mapped = BTreeMap::<String, Vec<Requirement>>::new();
         match expr {
             ast::Expr::Dict(dict) => {
@@ -206,15 +215,15 @@ impl SetupParser {
             }
             _ => (),
         }
-        return Err(PyValueError::new_err(
-            "Failed to parse Expr as BTreeMap<String, Vec<String>>.",
-        ));
+        return Err(PyValueError::new_err(format!(
+            "Failed to parse BTreeMap<String, Vec<String>> from Expr:\n{expr:#?}"
+        )));
     }
 
     fn parse_entrypoints(
         expr: &ast::Expr,
         assignments: &BTreeMap<String, ast::Expr>,
-    ) -> Result<Entrypoints, pyo3::PyErr> {
+    ) -> PyResult<Entrypoints> {
         match expr {
             ast::Expr::Dict(dict) => {
                 let mut entry_points = Entrypoints {
@@ -242,16 +251,16 @@ impl SetupParser {
             }
             _ => (),
         }
-        return Err(PyValueError::new_err(
-            "Failed to parse Expr as BTreeMap<String, Vec<String>>.",
-        ));
+        return Err(PyValueError::new_err(format!(
+            "Failed to parse Entrypoint from Expr:\n{expr:#?}"
+        )));
     }
 
     fn get_setup_call<'a>(
         statements: &'a Vec<ast::Stmt>,
         idx: &mut usize,
         assignments: &'a mut BTreeMap<String, ast::Expr>,
-    ) -> pyo3::PyResult<Option<(&'a ast::ExprCall, &'a mut BTreeMap<String, ast::Expr>)>> {
+    ) -> PyResult<Option<(&'a ast::ExprCall, &'a mut BTreeMap<String, ast::Expr>)>> {
         if *idx < statements.len() {
             match &statements[*idx] {
                 ast::Stmt::Assign(assignment) => {
@@ -285,31 +294,31 @@ impl SetupParser {
 }
 
 impl PyStr for ast::Expr {
-    fn to_string(&self) -> Result<String, pyo3::PyErr> {
+    fn to_string(&self) -> PyResult<String> {
         if let ast::Expr::Constant(c) = &self {
             if let ast::Constant::Str(s) = &c.value {
                 return Ok(s.clone());
             }
         }
-        return Err(PyValueError::new_err(
-            "Failed to parse String value from ExprConstant.",
-        ));
+        return Err(PyValueError::new_err(format!(
+            "Failed to parse String from Expr:\n{self:#?}"
+        )));
     }
 }
 
 impl PyIdent for ast::Expr {
-    fn as_ident(&self) -> pyo3::PyResult<String> {
+    fn as_ident(&self) -> PyResult<String> {
         match self {
             ast::Expr::Name(e) => Ok(e.id.to_string()),
-            _ => Err(PyTypeError::new_err(
-                "Expected name of Expr::Name in assignment parsing.",
-            )),
+            _ => Err(PyTypeError::new_err(format!(
+                "Expected Expr::Name in assignment parsing. Found:\n{self:#?}"
+            ))),
         }
     }
 }
 
 impl PyStrList for ast::Expr {
-    fn to_string_vec(&self) -> Result<Vec<String>, pyo3::PyErr> {
+    fn to_string_vec(&self) -> PyResult<Vec<String>> {
         if let ast::Expr::List(list) = &self {
             let mut result = Vec::<String>::new();
             for element in &list.elts {
@@ -321,14 +330,14 @@ impl PyStrList for ast::Expr {
             }
             return Ok(result);
         }
-        return Err(PyValueError::new_err(
-            "Failed to parse Expr as Vec<String>.",
-        ));
+        return Err(PyValueError::new_err(format!(
+            "Failed to parse Vec<String> from Expr:\n{self:#?}"
+        )));
     }
 }
 
 impl IdentValueMap for BTreeMap<String, ast::Expr> {
-    fn insert_assignments(&mut self, assignment: PyAssignment) -> pyo3::PyResult<&mut Self> {
+    fn insert_assignments(&mut self, assignment: PyAssignment) -> PyResult<&mut Self> {
         match assignment {
             PyAssignment::Unannotated(assignment) => {
                 let mut identifiers = Vec::<String>::new();

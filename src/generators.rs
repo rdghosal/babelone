@@ -1,5 +1,6 @@
+use pyo3::exceptions::PyOSError;
+use pyo3::PyResult;
 use std::collections::BTreeMap;
-use std::error::Error;
 use std::fs;
 use std::path::Path;
 
@@ -10,15 +11,15 @@ pub struct SetupGenerator;
 pub struct PyProjectGenerator;
 
 pub trait SpecGenerator<T> {
-    fn make_file(path: &Path, spec: &T) -> Result<(), Box<dyn Error>>;
+    fn make_file(path: &Path, spec: &T) -> PyResult<()>;
 }
 
-trait SetupKwarg { 
+trait SetupKwarg {
     fn as_kwarg_string(&self, kw: &str) -> String;
 }
 
 impl SpecGenerator<Requirements> for RequirementsGenerator {
-    fn make_file(path: &Path, spec: &Requirements) -> Result<(), Box<dyn Error>> {
+    fn make_file(path: &Path, spec: &Requirements) -> PyResult<()> {
         let mut contents = String::new();
         for requirement in spec.requires.iter() {
             contents.push_str(&requirement);
@@ -30,7 +31,7 @@ impl SpecGenerator<Requirements> for RequirementsGenerator {
 }
 
 impl SpecGenerator<Setup> for SetupGenerator {
-    fn make_file(path: &Path, spec: &Setup) -> Result<(), Box<dyn Error>> {
+    fn make_file(path: &Path, spec: &Setup) -> PyResult<()> {
         let mut contents = String::new();
         let docstring_end = if spec.package_name.as_ref().is_some_and(|s| !s.is_empty()) {
             format!(" for {}", &spec.package_name.as_ref().unwrap())
@@ -109,10 +110,16 @@ impl SetupKwarg for Option<Entrypoints> {
 }
 
 impl SpecGenerator<PyProject> for PyProjectGenerator {
-    fn make_file(path: &Path, spec: &PyProject) -> Result<(), Box<dyn Error>> {
-        let contents = toml::to_string_pretty::<PyProject>(&spec)?;
-        fs::write(path, contents)?;
-        Ok(())
+    fn make_file(path: &Path, spec: &PyProject) -> PyResult<()> {
+        if let Ok(contents) = toml::to_string_pretty::<PyProject>(&spec) {
+            fs::write(path, contents)?;
+            return Ok(());
+        }
+        Err(PyOSError::new_err(format!(
+            "Failed to write {:#?} with pyproject definition:\n{:#?}",
+            path.to_str(),
+            spec
+        )))
     }
 }
 
