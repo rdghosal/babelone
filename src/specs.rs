@@ -38,9 +38,9 @@ pub struct Entrypoints {
 /// Encapsulates build specifications defined in a pyproject.toml file.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PyProject {
-    pub project: Option<Project>,
     #[serde(rename = "build-system")]
     pub build_system: Option<BuildSystem>,
+    pub project: Option<Project>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
