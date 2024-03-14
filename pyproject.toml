@@ -5,23 +5,26 @@ build-backend = "maturin"
 [project]
 name = "babelone"
 dynamic = ["version"]
+requires-python = ">=3.8"
+dependencies = ["rich-click"]
 authors = [
     {name = "Rahul D. Ghosal", email = "rdghosal@gmail.com"}
 ]
 maintainers = [
     {name = "Rahul D. Ghosal", email = "rdghosal@gmail.com"}
 ]
+description = "CLI for scaffolding and translating Python build spec files."
 readme = "README.md"
-description = "CLI that helps scaffolding and translating Python build spec files."
-license = {file = "LICENSE"}
-requires-python = ">=3.8"
-dependencies = ["rich-click"]
+license = {text = "MIT License"}
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 keywords = ["rust", "pyo3", "rustpython", "cli"]
+
+[project.urls]
+repository = "https://github.com/rdghosal/babelone"
 
 [project.scripts]
 babelone = "babelone_cli:main"
